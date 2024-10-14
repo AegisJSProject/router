@@ -70,7 +70,7 @@ imported. This yields a powerful but minimal package size, dynamic loading of "V
 high reusability of code, and potentially nearly instant navigations, especially when used in
 conjunction with service workers and caches. Just create a script that has a `default` export
 that is a `Document`, `DocumentFragment`, `HTMLElement` and especially a custom element or
-web component, and map the `URLPattern`s to their respective modules. 
+web component, and map the `URLPattern`s to their respective modules.
 
 ## Example
 
@@ -78,43 +78,43 @@ web component, and map the `URLPattern`s to their respective modules.
 import { init, navigate, back, forward, reload } from '@aegisjsproject/router';
 
 init({
-	'/product/:productId': '@scope/views/product.js',
-	'/test/': '@scope/views/home.js',
-	'/search?q=:query': '@scope/views/search.js',
-	'/img': '/views/img.js',
+  '/product/:productId': '@scope/views/product.js',
+  '/test/': '@scope/views/home.js',
+  '/search?q=:query': '@scope/views/search.js',
+  '/img': '/views/img.js',
 }, {
-	preload: true, // Preload all registered modules
-	notFound: './views/404.js', // Set custom 404 module
-	rootNode: '#root', // Declares element for base of content updates
-	intceptRoot: document.body, // Use `MutationObserver` to observer `<a>` elements and intercept naviations
-	signal: controller.signal, // An `AbortSignal`, should you want to disable routing funcitonality
+  preload: true, // Preload all registered modules
+  notFound: './views/404.js', // Set custom 404 module
+  rootNode: '#root', // Declares element for base of content updates
+  intceptRoot: document.body, // Use `MutationObserver` to observer `<a>` elements and intercept naviations
+  signal: controller.signal, // An `AbortSignal`, should you want to disable routing funcitonality
 });
 
 document.querySelectorAll('[data-link]').forEach(el => {
-	el.addEventListener('click', ({ currentTarget }) => {
-		const { link, ...state } = currentTarget.dataset;
-		navigate(link, state);
-	});
+  el.addEventListener('click', ({ currentTarget }) => {
+    const { link, ...state } = currentTarget.dataset;
+    navigate(link, state);
+  });
 });
 
 document.querySelectorAll('[data-nav').forEach(el => {
-	el.addEventListener('click', ({ currentTarget }) => {
-		switch (currentTarget.dataset.nav) {
-			case 'back':
-				back();
-				break;
+  el.addEventListener('click', ({ currentTarget }) => {
+    switch (currentTarget.dataset.nav) {
+      case 'back':
+        back();
+        break;
 
-			case 'forward':
-				forward();
-				break;
+      case 'forward':
+        forward();
+        break;
 
-			case 'reload':
-				reload();
+      case 'reload':
+        reload();
 
-			default:
-				throw new TypeError(`Invalid nav button type: ${currentTarget.dataset.nav}.`);
-		}
-	});
+      default:
+        throw new TypeError(`Invalid nav button type: ${currentTarget.dataset.nav}.`);
+    }
+  });
 });
 ```
 
