@@ -11,7 +11,11 @@
 				"imports": {
 					"@aegisjsproject/": "../node_modules/@aegisjsproject/",
 					"@aegisjsproject/router": "../router.js",
-					"@aegisjsproject/router/": "../"
+					"@aegisjsproject/router/": "../",
+					"@highlightjs/cdn-assets/": "https://unpkg.com/@highlightjs/cdn-assets@11.10.0/es/",
+					"marked": "https://unpkg.com/marked@14.1.2/lib/marked.esm.js",
+					"marked-highlight": "https://unpkg.com/marked-highlight@2.1.4/src/index.js",
+					"highlight.js/": "https://unpkg.com/@highlightjs/cdn-assets@11.10.0/es/"
 				}
 			}
 		</script>
@@ -27,6 +31,7 @@
 			<button type="button" class="btn btn-primary" data-link="/product/1" data-name="Product 1" accesskey="1">Product 1</button>
 			<button type="button" class="btn btn-primary" data-link="/product/2" data-name="Product 2" accesskey="2">Product 2</button>
 			<a href="/product/3" class="btn btn-primary" accesskey="3">Product 3</a>
+			<a href="/page/markdown" class="btn btn-primary" accesskey="m">Markdown Test</a>
 			<button type="button" class="btn btn-primary" data-link="/search?q=shoes" accesskey="?">Search for Shoes</button>
 			<button type="button" class="btn btn-primary" data-link="/img" accesskey="i">Random Image</button>
 			<button type="button" class="btn btn-primary" data-link="/dne" accesskey="x">404 Page</button>

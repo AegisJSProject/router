@@ -4,6 +4,7 @@ globalThis.controller = new AbortController();
 
 init({
 	'/product/:productId': '@aegisjsproject/router/test/views/product.js',
+	'/page/markdown': '@aegisjsproject/router/test/views/markdown.js',
 	'/test/': '@aegisjsproject/router/test/views/home.js',
 	'/search?q=:query': '@aegisjsproject/router/test/views/search.js',
 	'/img': '@aegisjsproject/router/test/views/img.js',
