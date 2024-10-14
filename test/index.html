@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width" />
+		<meta name="color-scheme" content="light dark" />
+		<title>AegisJSProject State Management</title>
+		<base href="/test/" />
+		<script type="importmap">
+			{
+				"imports": {
+					"@aegisjsproject/": "../node_modules/@aegisjsproject/",
+					"@aegisjsproject/router": "../router.js",
+					"@aegisjsproject/router/": "../",
+					"@highlightjs/cdn-assets/": "https://unpkg.com/@highlightjs/cdn-assets@11.10.0/es/",
+					"@aegisjsproject/markdown/": "https://unpkg.com/@aegisjsproject/markdown@0.1.3/",
+					"marked": "https://unpkg.com/marked@14.1.2/lib/marked.esm.js",
+					"marked-highlight": "https://unpkg.com/marked-highlight@2.1.4/src/index.js",
+					"highlight.js/": "https://unpkg.com/@highlightjs/cdn-assets@11.10.0/es/"
+				}
+			}
+		</script>
+		<script type="application/javascript" defer="" referrerpolicy="no-referrer" fetchpriority="auto" crossorigin="anonymous" integrity="sha384-uaVA9Le/fIJMMUrQHZyGJ+aAH3EdIhOLxPl+cuBCvvZBltVoc+Kemy4t8KLX3/aF" src="https://unpkg.com/@shgysk8zer0/polyfills@0.4.2/all.min.js"></script>
+		<script type="module" src="./index.js"></script>
+	</head>
+	<body>
+		<nav id="nav">
+			<button type="button" class="btn btn-primary" data-nav="back" accesskey="&gt;">Back</button>
+			<button type="button" class="btn btn-primary" data-link="/test/" accesskey="h">Home</button>
+			<button type="button" class="btn btn-primary" data-nav="forward" accesskey="&lt;">Forward</button>
+			<button type="button" class="btn btn-primary" data-nav="reload" accesskey="r">Reload</button>
+			<button type="button" class="btn btn-primary" data-link="/product/1" data-name="Product 1" accesskey="1">Product 1</button>
+			<button type="button" class="btn btn-primary" data-link="/product/2" data-name="Product 2" accesskey="2">Product 2</button>
+			<a href="/product/3" class="btn btn-primary" accesskey="3">Product 3</a>
+			<a href="/page/markdown" class="btn btn-primary" accesskey="m">Markdown Test</a>
+			<button type="button" class="btn btn-primary" data-link="/search?q=shoes" accesskey="?">Search for Shoes</button>
+			<button type="button" class="btn btn-primary" data-link="/img" accesskey="i">Random Image</button>
+			<button type="button" class="btn btn-primary" data-link="/dne" accesskey="x">404 Page</button>
+		</nav>
+		<div id="root">
+			<stateful-el></stateful-el>
+		</div>
+	</body>
+</html>
