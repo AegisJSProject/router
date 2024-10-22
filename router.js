@@ -2,9 +2,12 @@ import { getStateObj, diffState, notifyStateChange } from '@aegisjsproject/state
 
 const registry = new Map();
 const matchSymbol = Symbol('matchResult');
+const NO_BODY_METHODS = ['GET', 'HEAD', 'DELETE', 'OPTIONS'];
 let rootEl = document.getElementById('root') ?? document.body;
 
-const mutObserver = new MutationObserver(entries => entries.forEach(entry => interceptNav(entry.target)));
+const mutObserver = new MutationObserver(entries => {
+	entries.forEach(entry => interceptNav(entry.target));
+});
 
 async function _popstateHandler(event) {
 	const diff = diffState(event.state);
@@ -14,16 +17,40 @@ async function _popstateHandler(event) {
 };
 
 function _interceptLinkClick(event) {
-	if (event.currentTarget.href.startsWith(location.origin)) {
+	if (event.isTrusted && event.currentTarget.href.startsWith(location.origin)) {
 		event.preventDefault();
 		navigate(event.currentTarget.href);
 	}
 };
 
-async function _getHTML(url) {
+function _interceptFormSubmit(event) {
+	if (event.isTrusted && event.target.action.startsWith(location.origin)) {
+		event.preventDefault();
+		const { method, action } = event.target;
+		const formData = new FormData(event.target);
+
+		if (NO_BODY_METHODS.includes(method.toUpperCase())) {
+			const url = new URL(action);
+			const params = new URLSearchParams(formData);
+
+			for (const [key, val] of formData.entries()) {
+				url.searchParams.append(key, val);
+			}
+
+			navigate(url, { method });
+		} else {
+			navigate(action, {}, { method, formData });
+		}
+	}
+}
+
+async function _getHTML(url, { signal, method = 'GET', body } = {}) {
 	const resp = await fetch(url, {
+		method,
+		body: NO_BODY_METHODS.includes(method.toUpperCase()) ? null : body,
 		headers: { 'Accept': 'text/html' },
 		referrerPolicy: 'no-referrer',
+		signal,
 	});
 
 	const html = await resp.text();
@@ -62,7 +89,9 @@ async function _handleModule(moduleSrc, args = {}) {
 	const state = getStateObj();
 	const timestamp = performance.now();
 
-	if (module instanceof Error) {
+	if (args.signal instanceof AbortSignal && args.signal.aborted) {
+		return args.signal.reason.message;
+	} else if (module instanceof Error) {
 		return module.message;
 	} else if (! ('default' in module)) {
 		return new Error(`${moduleSrc} has no default export.`);
@@ -75,11 +104,12 @@ async function _handleModule(moduleSrc, args = {}) {
 		}
 
 		module.default[matchSymbol] = args;
+
 		return module.default;
 	} else if (module.default instanceof Function) {
 		return await module.default({
-			state,
 			url,
+			state,
 			timestamp,
 			...args
 		});
@@ -90,20 +120,16 @@ async function _handleModule(moduleSrc, args = {}) {
 	}
 }
 
-let page404 = ({ url = location.href }) => {
+let view404 = ({ url = location.href, method = 'GET' }) => {
 	const div = document.createElement('div');
 	const p = document.createElement('p');
 	const a = document.createElement('a');
 
-	p.textContent = `${url} [404 Not Found]`;
+	p.textContent = `${method.toUpperCase()} ${url.input} [404 Not Found]`;
 	a.href = document.baseURI;
 	a.textContent = 'Go Home';
 
-	a.addEventListener('click', event => {
-		event.preventDefault();
-		navigate(event.currentTarget.href);
-	}, { once: true });
-
+	a.addEventListener('click', _interceptLinkClick);
 	div.append(p, a);
 
 	return div;
@@ -111,14 +137,20 @@ let page404 = ({ url = location.href }) => {
 
 export const findPath = input => registry.keys().find(pattern => pattern.test(input));
 
-export const set404 = path => page404 = path;
+export const set404 = path => view404 = path;
 
 export function interceptNav(target = document.body, { signal } = {}) {
-	if (target.tagName === 'A') {
+	if (target.tagName === 'A' && target.href.startsWith(location.origin)) {
 		entry.target.addEventListener('click', _interceptLinkClick, { signal, passive: false });
+	} else if (target.tagName === 'FORM' && target.action.startsWith(location.origin)) {
+		entry.target.addEventListener('submit', _interceptFormSubmit, { signal, passive: false });
 	} else {
 		target.querySelectorAll('a[href]').forEach(el => {
 			el.addEventListener('click', _interceptLinkClick, { passive: false, signal });
+		});
+
+		target.querySelectorAll('form').forEach(el => {
+			el.addEventListener('submit', _interceptFormSubmit, { passive: false, signal });
 		});
 	}
 }
@@ -143,7 +175,7 @@ export function observeLinksOn(target = document.body, { signal } = {}) {
 		mutObserver.observe(target, { childList: true, subtree: true });
 
 		if (signal instanceof AbortSignal) {
-			signal.addEventListener('abort', () => mutObserver.disconnect());
+			signal.addEventListener('abort', () => mutObserver.disconnect(), { once: true });
 		}
 	}
 }
@@ -160,44 +192,70 @@ export function registerPath(path, moduleSrc) {
 	}
 }
 
-export async function getModule(input = location) {
+export async function getModule(input = location, { signal, method = 'GET', formData = new FormData() } = {}) {
 	const timestamp = performance.now();
 
 	if (input === null) {
 		throw new Error('Invalid path.');
 	} else if (! (input instanceof URL)) {
-		return await getModule(URL.parse(input, document.baseURI));
+		return await getModule(URL.parse(input, document.baseURI), { signal, method, formData });
 	} else {
 		const match = findPath(input);
 
 		if (match instanceof URLPattern) {
-			return await _handleModule(registry.get(match), match.exec(input));
-		} else if (typeof page404 === 'string') {
-			return await _handleModule(page404, {});
-		} else if (page404 instanceof Function) {
-			_updatePage(page404({ timestamp, state: getStateObj(), url: new URL(location.href) }))
+			return await _handleModule(registry.get(match), { url: { input, matches: match.exec(input) }, signal, method, formData });
+		} else if (typeof view404 === 'string') {
+			return await _handleModule(view404, { url: { input, matches: null, }, signal, method, formData });
+		} else if (view404 instanceof Function) {
+			_updatePage(view404({ timestamp, state: getStateObj(), url: { input, matches: null }, signal, method, formData }))
 		} else {
-			return await _getHTML(input);
+			return await _getHTML(input, { method, signal, body: formData });
 		}
 	}
 }
 
-export async function navigate(url, state = getStateObj()) {
+export async function navigate(url, newState = getStateObj(), {
+	signal,
+	method = 'GET',
+	formData,
+} = {}) {
 	if (url === null) {
 		throw new TypeError('URL cannot be null.');
+	} else if (signal instanceof AbortSignal && signal.aborted) {
+		throw signal.reason;
 	} else if (! (url instanceof URL)) {
-		await navigate(URL.parse(url, document.baseURI), state);
+		return await navigate(URL.parse(url, document.baseURI), newState, { signal, method, formData });
+	} else if (formData instanceof FormData && NO_BODY_METHODS.includes(method.toUpperCase())) {
+		const params = new URLSearchParams(formData);
+
+		for (const [key, val] of params) {
+			url.searchParams.append(key, val);
+		}
+
+		return await navigate(url, newState, { signal, method });
 	} else if (url.href !== location.href) {
 		try {
-			rootEl.dispatchEvent(new Event('beforenavigate'));
-			history.pushState(state, '', url);
-			await notifyStateChange();
-			const content = await getModule(url);
+			const oldState = getStateObj();
+			const diff = diffState(newState, oldState);
+			const navigate = new CustomEvent('navigate', {
+				bubbles: true,
+				cancelable: true,
+				detail: { newState, oldState, destination: url.href, method, formData },
+			});
 
-			_updatePage(content);
-			rootEl.dispatchEvent(new Event('afternavigate'));
+			rootEl.dispatchEvent(navigate);
 
-			return content;
+			if (! navigate.defaultPrevented) {
+				history.pushState(newState, '', url);
+				await notifyStateChange(diff);
+				const content = await getModule(url, { signal, method, formData });
+
+				_updatePage(content);
+
+				return content;
+			} else {
+				return null;
+			}
 		} catch(err) {
 			back();
 			reportError(err);
@@ -231,7 +289,7 @@ export function removeListener() {
 
 export async function init(paths, {
 	preload = false,
-	intceptRoot = document.body,
+	inteceptRoot = document.body,
 	baseURL = document.baseURI,
 	notFound,
 	rootNode,
@@ -253,8 +311,8 @@ export async function init(paths, {
 		setRoot(rootNode);
 	}
 
-	if (intceptRoot instanceof HTMLElement || typeof intceptRoot === 'string') {
-		observeLinksOn(intceptRoot, { signal });
+	if (inteceptRoot instanceof HTMLElement || typeof inteceptRoot === 'string') {
+		observeLinksOn(inteceptRoot, { signal });
 	}
 
 	const content = await getModule(new URL(location.href));

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.0.1] - 2024-10-21
+
+### Added
+- Add support for `method` and `formData` in navigation and module handling
+- Add form submit handler
+- Add `navigate` event, which can have default prevented (`event.preventDefault()`) to cancel navigation
+
+### Changed
+- Update `@aegisjsproject/state`
+
+### Fixed
+- Fix typo
+
 ## [v1.0.0] - 2024-10-13
 
 Initial Release

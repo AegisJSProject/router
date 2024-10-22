@@ -1,6 +1,6 @@
 {
   "name": "@aegisjsproject/router",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A simple but powerful router module",
   "keywords": [],
   "type": "module",
@@ -77,10 +77,12 @@
     "url": "https://github.com/AegisJSProject/router/issues"
   },
   "homepage": "https://github.com/AegisJSProject/router#readme",
+  "dependencies": {
+    "@aegisjsproject/state": "^1.0.1"
+  },
   "devDependencies": {
     "@aegisjsproject/component": "^0.1.4",
     "@aegisjsproject/core": "^0.2.15",
-    "@aegisjsproject/state": "^1.0.0",
     "@rollup/plugin-node-resolve": "^15.3.0",
     "@shgysk8zer0/eslint-config": "^1.0.1",
     "eslint": "^9.12.0",
