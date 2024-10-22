@@ -3,6 +3,7 @@ class ProductView extends HTMLElement {
 
 	constructor(params) {
 		super();
+		console.log(params);
 		this.#shadow = this.attachShadow({ mode: 'closed' });
 		const pre = document.createElement('pre');
 		const code = document.createElement('code');

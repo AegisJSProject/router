@@ -3,18 +3,30 @@ import { init, navigate, back, forward, reload } from '@aegisjsproject/router';
 globalThis.controller = new AbortController();
 
 init({
-	'/product/:productId': '@aegisjsproject/router/test/views/product.js',
-	'/page/markdown': '@aegisjsproject/router/test/views/markdown.js',
-	'/test/': '@aegisjsproject/router/test/views/home.js',
-	'/search?q=:query': '@aegisjsproject/router/test/views/search.js',
-	'/img': '@aegisjsproject/router/test/views/img.js',
+	'/product/:productId': '@view/product.js',
+	'/page/markdown': '@view/markdown.js',
+	'/test/': '@view/home.js',
+	'/search?q=:query': '@view/search.js',
+	'/img': '@view/img.js',
 }, {
 	preload: true,
-	notFound: '@aegisjsproject/router/test/views/404.js',
+	notFound: '@view/404.js',
 	rootNode: '#root',
-	intceptRoot: document.body,
+	inteceptRoot: document.body,
 	signal: controller.signal,
 });
+
+globalThis.base64ToBlob = function(input) {
+	const pattern = new URLPattern({ protocol: 'data:', pathname: ':type;base64,:data' });
+	const { type, data } = pattern.exec(input)?.pathname?.groups ?? {};
+
+	if (typeof type === 'string' && typeof data === 'string') {
+		const bytes = Uint8Array.fromBase64(data);
+		return new Blob([bytes], { type });
+	} else {
+		return null;
+	}
+}
 
 document.querySelectorAll('[data-link]').forEach(el => {
 	el.addEventListener('click', ({ currentTarget }) => {
