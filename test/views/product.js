@@ -3,13 +3,19 @@ class ProductView extends HTMLElement {
 
 	constructor(params) {
 		super();
-		console.log(params);
-		this.#shadow = this.attachShadow({ mode: 'closed' });
-		const pre = document.createElement('pre');
-		const code = document.createElement('code');
-		code.textContent = JSON.stringify(params, null, 4);
-		pre.append(code);
-		this.#shadow.append(pre);
+
+		if (this.shadowRoot === null) {
+			this.#shadow = this.attachShadow({ mode: 'open', clonable: true, serializable: true });
+			const pre = document.createElement('pre');
+			const code = document.createElement('code');
+			code.textContent = JSON.stringify(params, null, 4);
+			pre.append(code);
+			this.#shadow.append(pre);
+		} else {
+			this.#shadow = this.shadowRoot;
+		}
+
+		console.log(this.shadowRoot);
 	}
 
 	connectedCallback() {
