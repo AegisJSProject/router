@@ -8,6 +8,8 @@ init({
 	'/test/': '@view/home.js',
 	'/search?q=:query': '@view/search.js',
 	'/img': '@view/img.js',
+	'/page/bacon/:lines': '@view/bacon.js',
+	'/github/:username': '@view/github.js',
 }, {
 	preload: true,
 	notFound: '@view/404.js',
@@ -16,18 +18,6 @@ init({
 	signal: controller.signal,
 });
 
-globalThis.base64ToBlob = function(input) {
-	const pattern = new URLPattern({ protocol: 'data:', pathname: ':type;base64,:data' });
-	const { type, data } = pattern.exec(input)?.pathname?.groups ?? {};
-
-	if (typeof type === 'string' && typeof data === 'string') {
-		const bytes = Uint8Array.fromBase64(data);
-		return new Blob([bytes], { type });
-	} else {
-		return null;
-	}
-}
-
 document.querySelectorAll('[data-link]').forEach(el => {
 	el.addEventListener('click', ({ currentTarget }) => {
 		const { link, ...state } = currentTarget.dataset;
@@ -35,7 +25,7 @@ document.querySelectorAll('[data-link]').forEach(el => {
 	}, { signal: controller.signal });
 });
 
-document.querySelectorAll('[data-nav').forEach(el => {
+document.querySelectorAll('[data-nav]').forEach(el => {
 	el.addEventListener('click', ({ currentTarget }) => {
 		switch (currentTarget.dataset.nav) {
 			case 'back':
