@@ -45,8 +45,8 @@ or use an [importmap](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/
 <script type="importmap">
 {
   "imports": {
-    "@aegisjsproject/router": "https://unpkg.com/@aegisjsproject/router[@version]/router.js",
-    "@aegisjsproject/state": "https://unpkg.com/@aegisjsproject/state[@version]/state.js"
+    "@aegisjsproject/router": "https://unpkg.com/@aegisjsproject/router[@version]/router.mjs",
+    "@aegisjsproject/state": "https://unpkg.com/@aegisjsproject/state[@version]/state.mjs"
   }
 }
 </script>
@@ -65,7 +65,7 @@ or use an [importmap](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/
 
 ## Fundamentals
 
-At its core, this package matches matches URLs matching a `URLPattern` to modules to be dynamically
+At its core, this package matches URLs matching a `URLPattern` to modules to be dynamically
 imported. This yields a powerful but minimal package size, dynamic loading of "View"s as-needed,
 high reusability of code, and potentially nearly instant navigations, especially when used in
 conjunction with service workers and caches. Just create a script that has a `default` export
@@ -86,7 +86,7 @@ init({
   preload: true, // Preload all registered modules
   notFound: './views/404.js', // Set custom 404 module
   rootNode: '#root', // Declares element for base of content updates
-  intceptRoot: document.body, // Use `MutationObserver` to observer `<a>` elements and intercept naviations
+  interceptRoot: document.body, // Use `MutationObserver` to observer `<a>` elements and intercept navigations
   signal: controller.signal, // An `AbortSignal`, should you want to disable routing funcitonality
 });
 
@@ -97,7 +97,7 @@ document.querySelectorAll('[data-link]').forEach(el => {
   });
 });
 
-document.querySelectorAll('[data-nav').forEach(el => {
+document.querySelectorAll('[data-nav]').forEach(el => {
   el.addEventListener('click', ({ currentTarget }) => {
     switch (currentTarget.dataset.nav) {
       case 'back':
@@ -136,9 +136,11 @@ This observer watches for `<a>`s in the children of what it is set to observe an
 to avoid the default navigation, then calls `navigate(a.href)`.
 
 > [!NOTE]
-> While the `MutationObserver` automatically adds the necessary click handlers on all `<a>` elements under its
-> root, it cannot reach into Shadow DOM. For any web component with shadow, you should call `observeLinksOn(shadow)`
+> While the `MutationObserver` automatically adds the necessary click handlers on all `<a>` and `<form>` elements under its
+> root, it cannot reach into Shadow DOM. For any web component with shadow, you should call `interceptNav(shadow)`
 > in either the constructor or `connectedCallback`.
+
+
 
 ## 404 Pages
 You can register a module for 404 pages using either `set404()` or by passing it via `{ notFound }` in `init()`.
@@ -147,10 +149,17 @@ This component or function will be given the current state and URL and can be dy
 ## Preloading
 You can preload modules for views by using `preloadModule()` or by passing `{ preload: true }` in `init()`.
 Preloading modules will make navigation effectively instant and potentially without network traffic, however
-it will increase initial load times (though you can set low priority to let the browser decide when to preload).
+it will increase initial load times (though it defaults to a low priority).
 
-## State Managment
+> [!IMPORTANT]
+> Be advised that there may be a functional difference between using the router in the context of a `<script type="module">`
+> vs as a non-module, namely in the availability of [`import.meta.resolve()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/import.meta/resolve)
+> for preloading. Also, that importmaps are not quite univerally supported yet. For best compatibility,
+> you **SHOULD** use either absolute or relative URLs when declaring modules for routes, though use of
+> module specifiers (e.g. `@scope/package`) is supported in certain contexts, with decent browser support.
+
+## State Management
 This currently uses [`@aegisjsproject/state`](https://npmjs.com/package/@aegisjsproject/state) for state
 mangement. It is a lightweight wrapper around `history.state` that uses `BroadcastChannel` to sync state
-changes between tabs/windows. It should be noted that this is `global` state and not specific to some component,
+changes between tabs/windows. It should be noted that this is *global* state and not specific to some component,
 so please avoid generic names and be aware of the global nature.

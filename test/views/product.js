@@ -14,8 +14,6 @@ class ProductView extends HTMLElement {
 		} else {
 			this.#shadow = this.shadowRoot;
 		}
-
-		console.log(this.shadowRoot);
 	}
 
 	connectedCallback() {
