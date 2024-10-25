@@ -140,12 +140,7 @@ to avoid the default navigation, then calls `navigate(a.href)`.
 > root, it cannot reach into Shadow DOM. For any web component with shadow, you should call `interceptNav(shadow)`
 > in either the constructor or `connectedCallback`.
 
-> [!IMPORTANT]
-> Be advised that there may be a functional difference between using the router in the context of a `<script type="module">`
-> vs as a non-module, namely in the availability of [`import.meta.resolve()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/import.meta/resolve)
-> for preloading. Also, that importmaps are not quite univerally supported yet. For best compatibility,
-> you **SHOULD** use either absolute or relative URLs when declaring modules for routes, though use of 
-> module specifiers (e.g. `@scope/package`) is supported in certain contexts, with decent browser support.
+
 
 ## 404 Pages
 You can register a module for 404 pages using either `set404()` or by passing it via `{ notFound }` in `init()`.
@@ -155,6 +150,13 @@ This component or function will be given the current state and URL and can be dy
 You can preload modules for views by using `preloadModule()` or by passing `{ preload: true }` in `init()`.
 Preloading modules will make navigation effectively instant and potentially without network traffic, however
 it will increase initial load times (though it defaults to a low priority).
+
+> [!IMPORTANT]
+> Be advised that there may be a functional difference between using the router in the context of a `<script type="module">`
+> vs as a non-module, namely in the availability of [`import.meta.resolve()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/import.meta/resolve)
+> for preloading. Also, that importmaps are not quite univerally supported yet. For best compatibility,
+> you **SHOULD** use either absolute or relative URLs when declaring modules for routes, though use of 
+> module specifiers (e.g. `@scope/package`) is supported in certain contexts, with decent browser support.
 
 ## State Management
 This currently uses [`@aegisjsproject/state`](https://npmjs.com/package/@aegisjsproject/state) for state
