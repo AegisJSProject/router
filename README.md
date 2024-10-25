@@ -155,7 +155,7 @@ it will increase initial load times (though it defaults to a low priority).
 > Be advised that there may be a functional difference between using the router in the context of a `<script type="module">`
 > vs as a non-module, namely in the availability of [`import.meta.resolve()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/import.meta/resolve)
 > for preloading. Also, that importmaps are not quite univerally supported yet. For best compatibility,
-> you **SHOULD** use either absolute or relative URLs when declaring modules for routes, though use of 
+> you **SHOULD** use either absolute or relative URLs when declaring modules for routes, though use of
 > module specifiers (e.g. `@scope/package`) is supported in certain contexts, with decent browser support.
 
 ## State Management
