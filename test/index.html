@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html lang="en" dir="ltr" class="preload">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width" />
@@ -18,12 +18,39 @@
 					"marked": "https://unpkg.com/marked@14.1.2/lib/marked.esm.js",
 					"marked-highlight": "https://unpkg.com/marked-highlight@2.1.4/src/index.js",
 					"highlight.js/": "https://unpkg.com/@highlightjs/cdn-assets@11.10.0/es/",
-					"@view/": "/test/views/"
+					"@view/": "/test/views/",
+					"@views/": "/test/views/"
 				}
 			}
 		</script>
 		<script type="application/javascript" defer="" referrerpolicy="no-referrer" fetchpriority="auto" crossorigin="anonymous" integrity="sha384-uaVA9Le/fIJMMUrQHZyGJ+aAH3EdIhOLxPl+cuBCvvZBltVoc+Kemy4t8KLX3/aF" src="https://unpkg.com/@shgysk8zer0/polyfills@0.4.2/all.min.js"></script>
 		<script type="module" src="./index.js"></script>
+		<!-- <script src="./index.min.js" defer=""></script> -->
+		<!-- <script type="application/json" id="routes">
+			{
+				"/product/:productId": "/test/views/product.js",
+				"/page/markdown": "/test/views/markdown.js",
+				"/test/": "/test/views/home.js",
+				"/search?q=:query": "/test/views/search.js",
+				"/img": "/test/views/img.js",
+				"/page/bacon/:lines": "/test/views/bacon.js",
+				"/github/:username": "/test/views/github.js"
+			}
+		</script> -->
+		<script type="application/json" id="routes">
+			{
+				"/product/:productId": "@views/product.js",
+				"/page/markdown": "@views/markdown.js",
+				"/test/": "@views/home.js",
+				"/search?q=:query": "@views/search.js",
+				"/img": "@views/img.js",
+				"/page/bacon/:lines": "@views/bacon.js",
+				"/github/:username": "@views/github.js"
+			}
+		</script>
+		 <!-- <script>
+			import('./index.js').then(console.log, console.error);
+		 </script> -->
 	</head>
 	<body>
 		<nav id="nav">

@@ -1,11 +1,11 @@
 import { getStateObj, diffState, notifyStateChange } from '@aegisjsproject/state';
 
+const isModule = ! (document.currentScript instanceof HTMLScriptElement);
+const supportsImportmap = HTMLScriptElement.supports('importmap');
 const registry = new Map();
-const matchSymbol = Symbol('matchResult');
 const NO_BODY_METHODS = ['GET', 'HEAD', 'DELETE', 'OPTIONS'];
-let rootEl = document.getElementById('root') ?? document.body;
-
 const mutObserver = new MutationObserver(entries => entries.forEach(entry => interceptNav(entry.target)));
+let rootEl = document.getElementById('root') ?? document.body;
 
 async function _popstateHandler(event) {
 	const diff = diffState(event.state);
@@ -14,6 +14,32 @@ async function _popstateHandler(event) {
 	_updatePage(content);
 };
 
+function _isModuleURL(src) {
+	switch(src[0]) {
+		case '/':
+		case '.':
+			return true;
+
+		case 'h':
+			return src.substring(0, '4') === 'http' && URL.canParse(src);
+
+		default:
+			return false;
+	}
+}
+
+function _resolveModule(src) {
+	if (_isModuleURL(src)) {
+		return URL.parse(src, document.baseURI);
+	} else if (! supportsImportmap) {
+		throw new TypeError('Importmaps and module specifiers are not supported');
+	} else if (! isModule) {
+		throw new TypeError('Cannot resolve a module specifier outside of a module script.');
+	} else {
+		return import.meta.resolve(src);
+	}
+}
+
 function _interceptLinkClick(event) {
 	if (event.isTrusted && event.currentTarget.href.startsWith(location.origin)) {
 		event.preventDefault();
@@ -21,7 +47,7 @@ function _interceptLinkClick(event) {
 	}
 };
 
-function _interceptFormSubmit(event) {
+async function _interceptFormSubmit(event) {
 	if (event.isTrusted && event.target.action.startsWith(location.origin)) {
 		event.preventDefault();
 		const { method, action } = event.target;
@@ -31,13 +57,13 @@ function _interceptFormSubmit(event) {
 			const url = new URL(action);
 			const params = new URLSearchParams(formData);
 
-			for (const [key, val] of formData.entries()) {
+			for (const [key, val] of params.entries()) {
 				url.searchParams.append(key, val);
 			}
 
-			navigate(url, { method });
+			await navigate(url, getStateObj(), { method });
 		} else {
-			navigate(action, {}, { method, formData });
+			await navigate(action, getStateObj(), { method, formData });
 		}
 	}
 }
@@ -67,12 +93,12 @@ function _updatePage(content) {
 	} else if (content instanceof HTMLTemplateElement) {
 		rootEl.replaceChildren(content.cloneNode(true).content);
 	} else if (content instanceof Function && content.prototype instanceof HTMLElement) {
-		const match = content[matchSymbol] ?? {};
-		rootEl.replaceChildren(new content({ state: getStateObj(), url: new URL(location.href), timestamp, ...match }));
+		rootEl.replaceChildren(new content({ state: getStateObj(), url: new URL(location.href), timestamp }));
 	} else if (content instanceof HTMLElement) {
 		// Cannot clone custom elements with non-clonable shadow roots (and cannot test on closed shadows)
 		const isClonable = typeof customElements.getName(content.constructor) !== 'string'
 			|| (content.shadowRoot instanceof ShadowRoot && content.shadowRoot.clonable);
+
 		rootEl.replaceChildren(isClonable ? content.cloneNode(true) : content);
 	} else if (content instanceof Node) {
 		rootEl.replaceChildren(content.cloneNode(true));
@@ -87,7 +113,10 @@ function _updatePage(content) {
 }
 
 async function _handleModule(moduleSrc, args = {}) {
-	const module = await Promise.try(() => import(moduleSrc)).catch(err => err);
+	const module = await Promise.try(() => _isModuleURL(moduleSrc)
+		? import(URL.parse(moduleSrc, document.baseURI))
+		: import(moduleSrc)).catch(err => err);
+
 	const url = new URL(location.href);
 	const state = getStateObj();
 	const timestamp = performance.now();
@@ -106,9 +135,12 @@ async function _handleModule(moduleSrc, args = {}) {
 			);
 		}
 
-		// module.default[matchSymbol] = args;
-
-		return new module.default(args);
+		return new module.default({
+			url,
+			state,
+			timestamp,
+			...args
+		});
 	} else if (module.default instanceof Function) {
 		return await module.default({
 			url,
@@ -123,12 +155,12 @@ async function _handleModule(moduleSrc, args = {}) {
 	}
 }
 
-let view404 = ({ url = location.href, method = 'GET' }) => {
+let view404 = ({ url = location, method = 'GET' }) => {
 	const div = document.createElement('div');
 	const p = document.createElement('p');
 	const a = document.createElement('a');
 
-	p.textContent = `${method.toUpperCase()} ${url.input} [404 Not Found]`;
+	p.textContent = `${method.toUpperCase()} ${url.href} [404 Not Found]`;
 	a.href = document.baseURI;
 	a.textContent = 'Go Home';
 
@@ -162,12 +194,20 @@ export const set404 = path => view404 = path;
  */
 export function interceptNav(target = document.body, { signal } = {}) {
 	if (target.tagName === 'A' && target.href.startsWith(location.origin)) {
-		entry.target.addEventListener('click', _interceptLinkClick, { signal, passive: false });
+		target.addEventListener('click', _interceptLinkClick, { signal, passive: false });
 	} else if (target.tagName === 'FORM' && target.action.startsWith(location.origin)) {
-		entry.target.addEventListener('submit', _interceptFormSubmit, { signal, passive: false });
+		target.addEventListener('submit', _interceptFormSubmit, { signal, passive: false });
+
+		target.querySelectorAll('a[href]:not([rel~="external"])').forEach(el => {
+			if (el.href.startsWith(location.origin)) {
+				el.addEventListener('click', _interceptLinkClick, { passive: false, signal });
+			}
+		});
 	} else {
-		target.querySelectorAll('a[href]').forEach(el => {
-			el.addEventListener('click', _interceptLinkClick, { passive: false, signal });
+		target.querySelectorAll('a[href]:not([rel~="external"])').forEach(el => {
+			if (el.href.startsWith(location.origin)) {
+				el.addEventListener('click', _interceptLinkClick, { passive: false, signal });
+			}
 		});
 
 		target.querySelectorAll('form').forEach(el => {
@@ -219,13 +259,17 @@ export function observeLinksOn(target = document.body, { signal } = {}) {
  * @param {URLPattern|string|URL} path - The URL pattern or URL to register.
  * @param {string} moduleSrc - The module source URL.
  */
-export function registerPath(path, moduleSrc) {
+export function registerPath(path, moduleSrc, { preload = false } = {}) {
 	if (typeof path === 'string') {
-		registerPath(new URLPattern(path, document.baseURI), moduleSrc);
+		registerPath(new URLPattern(path, document.baseURI), moduleSrc, { preload });
 	} else if (path instanceof URL) {
-		registerPath(path.href, moduleSrc);
+		registerPath(new URLPattern(path.href), moduleSrc, { preload });
 	} else if (path instanceof URLPattern) {
 		registry.set(path, moduleSrc);
+
+		if (preload) {
+			preloadModule(moduleSrc);
+		}
 	} else {
 		throw new TypeError(`Could not convert ${path} to a URLPattern.`);
 	}
@@ -253,11 +297,11 @@ export async function getModule(input = location, { signal, method = 'GET', form
 		const match = findPath(input);
 
 		if (match instanceof URLPattern) {
-			return await _handleModule(registry.get(match), { url: { input, matches: match.exec(input) }, signal, method, formData });
+			return await _handleModule(registry.get(match), { url: input, matches: match.exec(input), signal, method, formData });
 		} else if (typeof view404 === 'string') {
-			return await _handleModule(view404, { url: { input, matches: null, }, signal, method, formData });
+			return await _handleModule(view404, { url: input, matches: null, signal, method, formData });
 		} else if (view404 instanceof Function) {
-			_updatePage(view404({ timestamp, state: getStateObj(), url: { input, matches: null }, signal, method, formData }))
+			_updatePage(view404({ timestamp, state: getStateObj(), url: input, matches: null, signal, method, formData }));
 		} else {
 			return await _getHTML(input, { method, signal, body: formData });
 		}
@@ -374,77 +418,118 @@ export function removeListener() {
 /**
  * Initializes the navigation system.
  *
- * @param {object} paths - An object mapping URL patterns to module source URLs or specifiers.
+ * @param {object|string|HTMLScriptElement} routes - An object mapping URL patterns to module source URLs or specifiers, or a script/id to script
  * @param {object} [options] - Optional options.
  * @param {boolean} [options.preload=false] - Whether to preload all modules.
- * @param {HTMLElement|string} [options.interceptRoot] - The element to intercept link clicks on.
+ * @param {HTMLElement|string} [options.inteceptRoot] - The element to intercept link clicks on.
  * @param {string} [options.baseURL] - The base URL for URL patterns.
  * @param {string} [options.notFound] - The 404 handler.
  * @param {HTMLElement|string} [options.rootNode] - The root element for the navigation system.
  * @param {AbortSignal} [options.signal] - An AbortSignal to cancel the initialization.
  * @returns {Promise<void>} - A promise that resolves when the initialization is complete.
  */
-export async function init(paths, {
+export async function init(routes, {
 	preload = false,
 	inteceptRoot = document.body,
 	baseURL = location.origin,
+	crossOrigin = 'anonymous',
+	referrerPolicy = 'no-referrer',
+	fetchPriority = 'low',
+	as = 'script',
 	notFound,
 	rootNode,
 	signal,
 } = {}) {
-	if (typeof paths === 'object') {
-		Object.entries(paths).forEach(([pattern, moduleSrc]) => registerPath(new URLPattern(pattern, baseURL), moduleSrc));
-	}
+	if (typeof routes === 'string') {
+		await init(document.querySelector(routes), { preload, inteceptRoot, baseURL, notFound, rootNode, signal });
+	} else if (routes instanceof HTMLScriptElement && routes.type === 'application/json') {
+		await init(JSON.parse(routes.textContent), { preload, inteceptRoot, baseURL, notFound, rootNode, signal });
+	} else if (typeof routes !== 'object' || routes === null || Object.getPrototypeOf(routes) !== Object.prototype) {
+		throw new TypeError('Routes must be a plain object, a script with JSON, or the selector to such a script.');
+	} else {
+		const opts = { preload, signal, crossOrigin, referrerPolicy, fetchPriority, as };
+		Object.entries(routes).forEach(([pattern, moduleSrc]) => registerPath(new URLPattern(pattern, baseURL), moduleSrc, opts));
 
-	if (preload) {
-		Object.values(paths).forEach(src => preloadModule(src));
-	}
+		if (typeof notFound === 'string') {
+			set404(notFound);
 
-	if (typeof notFound !== 'undefined') {
-		set404(notFound);
-	}
+			if (preload) {
+				preloadModule(notFound);
+			}
+		}
 
-	if (rootNode instanceof HTMLElement || typeof rootNode === 'string') {
-		setRoot(rootNode);
-	}
+		if (rootNode instanceof HTMLElement || typeof rootNode === 'string') {
+			setRoot(rootNode);
+		}
 
-	if (inteceptRoot instanceof HTMLElement || typeof inteceptRoot === 'string') {
-		observeLinksOn(inteceptRoot, { signal });
-	}
+		if (inteceptRoot instanceof HTMLElement || typeof inteceptRoot === 'string') {
+			observeLinksOn(inteceptRoot, { signal });
+		}
 
-	const content = await getModule(new URL(location.href));
-	_updatePage(content);
-	addPopstateListener({ signal });
+		const content = await getModule(new URL(location.href));
+		_updatePage(content);
+		addPopstateListener({ signal });
+	}
 }
 
 /**
  * Preloads a module asynchronously.
  *
- * @param {string} src - The URL or path to the module to preload.
+ * @param {string} src - The URL or specifier to the module to preload.
  * @param {object} [options] - Optional options for the preload element.
  * @param {string} [options.crossOrigin="anonymous"] - The CORS mode to use when fetching the module. Defaults to 'anonymous'.
  * @param {string} [options.referrerPolicy="no-referrer"] - The referrer policy to use when fetching the module. Defaults to 'no-referrer'.
  * @param {string} [options.fetchPriority="low"] - The fetch priority for the preload request. Defaults to 'auto'.
  * @param {string} [options.as="script"] - The type of resource to preload. Defaults to 'script'.
+ * @returns {Promise<void>} A promise that resolves when the module is preloaded or rejects on error or signal is aborted.
+ * @throws {Error} Throws if the signal is aborted or if an `error` event is fired on the preload.
  */
-export function preloadModule(src, {
+export async function preloadModule(src, {
 	crossOrigin = 'anonymous',
 	referrerPolicy = 'no-referrer',
 	fetchPriority = 'low',
 	as = 'script',
+	signal: passedSignal = AbortSignal.timeout(5000),
 } = {}) {
-	const link = document.createElement('link');
-	link.rel = 'modulepreload';
-	link.fetchPriority = fetchPriority;
-	link.crossOrigin = crossOrigin;
-	link.referrerPolicy = referrerPolicy;
-	link.as = as;
 
-	if (import.meta.resolve instanceof Function) {
-		link.href = import.meta.resolve(src);
+	const { promise, resolve, reject } = Promise.withResolvers();
+	const link = document.createElement('link');
+
+	if (passedSignal.aborted) {
+		reject(passedSignal.reason);
 	} else {
-		link.href = src;
+		const controller = new AbortController();
+		const signal = AbortSignal.any([controller.signal, passedSignal]);
+
+		link.addEventListener('load', () => {
+			resolve();
+			controller.abort();
+		}, { signal });
+
+		link.addEventListener('error', () => {
+			reject(new DOMException(`Error loading ${src}`, 'NotFoundError'));
+			controller.abort();
+		}, { signal });
+
+		passedSignal.addEventListener('abort', ({ target }) => {
+			reject(target.reason);
+		}, { signal: controller.signal });
+
+		link.rel = 'modulepreload';
+		link.fetchPriority = fetchPriority;
+		link.crossOrigin = crossOrigin;
+		link.referrerPolicy = referrerPolicy;
+		link.as = as;
+		link.href = _resolveModule(src);
+
+		document.head.append(link);
 	}
 
-	document.head.append(link);
+	await promise.then(() => link.remove()).catch(err => {
+		if (link.isConnected) {
+			link.remove();
+		}
+
+		reportError(err);
+	});
 }

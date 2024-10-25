@@ -2,17 +2,9 @@ import { init, navigate, back, forward, reload } from '@aegisjsproject/router';
 
 globalThis.controller = new AbortController();
 
-init({
-	'/product/:productId': '@view/product.js',
-	'/page/markdown': '@view/markdown.js',
-	'/test/': '@view/home.js',
-	'/search?q=:query': '@view/search.js',
-	'/img': '@view/img.js',
-	'/page/bacon/:lines': '@view/bacon.js',
-	'/github/:username': '@view/github.js',
-}, {
-	preload: true,
-	notFound: '@view/404.js',
+init('#routes', {
+	preload: document.documentElement.classList.contains('preload'),
+	notFound: '/test/views/404.js',
 	rootNode: '#root',
 	inteceptRoot: document.body,
 	signal: controller.signal,

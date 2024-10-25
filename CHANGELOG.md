@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.0.3] - 2024-10-24
+
+### Added
+- Add direct support for preloading in `registerPath()`
+
+### Changed
+- Update handling of importing/preloading modules
+- Make `preloadModule()` async, resolving or rejecting based on `load` and `error` events
+
+### Fixed
+- Fix consistency or args passed to constructors/functions
+
 ## [v1.0.2] - 2024-10-23
 
 ### Added
