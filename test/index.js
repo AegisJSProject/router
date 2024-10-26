@@ -1,4 +1,4 @@
-import { init, navigate, back, forward, reload, preload, dnsPrefetch, NAV_EVENT, registerPath } from '@aegisjsproject/router/router.js';
+import { init, navigate, back, forward, reload, preload, dnsPrefetch } from '@aegisjsproject/router/router.js';
 import { observeEvents } from '@aegisjsproject/core/events.js';
 
 const controller = new AbortController();
@@ -13,17 +13,6 @@ new CSSStyleSheet().replace(`
 
 console.time('init');
 console.time('preload');
-
-registerPath('/foo/?foo=:foo', ({ matches, ...rest }) => {
-	console.log(rest);
-	return new URL(`${location.origin}/product/${matches.search.groups.foo}`);
-});
-
-document.addEventListener(NAV_EVENT, event => console.info(`${event.type} = ${event.reason} <${event.url}>`));
-
-// Object.values(EVENTS).forEach(event => {
-// 	document.addEventListener(event, requestCancel);
-// });
 
 const initialized = init('#routes', {
 	preload: document.documentElement.classList.contains('preload'),

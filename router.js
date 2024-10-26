@@ -19,6 +19,7 @@ export const EVENT_TYPES = {
 	pop: 'aegis:router:pop',
 	go: 'aegis:router:go',
 	load: 'aegis:router:load',
+	submit: 'aegis:router:submit',
 };
 
 export class NavigationEvent extends CustomEvent {
@@ -203,7 +204,15 @@ async function _interceptFormSubmit(event) {
 		const { method, action } = event.target;
 		const formData = new FormData(event.target);
 
-		if (NO_BODY_METHODS.includes(method.toUpperCase())) {
+		const submit = new NavigationEvent(NAV_EVENT, EVENT_TYPES.submit, {
+			detail: { oldState: getStateObj(), oldURL: new URL(location.href), formData },
+		});
+
+		document.dispatchEvent(submit);
+
+		if (submit.defaultPrevented) {
+			return;
+		} else if (NO_BODY_METHODS.includes(method.toUpperCase())) {
 			const url = new URL(action);
 			const params = new URLSearchParams(formData);
 
@@ -800,7 +809,7 @@ export async function init(routes, {
 	as = 'script',
 	scrollRestoration = 'auto',
 	notFound,
-	rootEl,
+	rootEl: root,
 	signal,
 } = {}) {
 	if (typeof routes === 'string') {
@@ -822,8 +831,8 @@ export async function init(routes, {
 			}
 		}
 
-		if (rootEl instanceof HTMLElement || typeof rootEl === 'string') {
-			setRoot(rootEl);
+		if (root instanceof HTMLElement || typeof root === 'string') {
+			setRoot(root);
 		}
 
 		if (inteceptRoot instanceof HTMLElement || typeof inteceptRoot === 'string') {
