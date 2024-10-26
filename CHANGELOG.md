@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.0.4] - 2024-10-28
+
+### Added
+- Add `SearchParam` and `manageSearch` and `getSearch` for utilizing URL search params as state
+- Add `getNavController` and `getNavSignal` and `whenNavigated` for cleanup on navigation
+- Add more preloading/prefetch/preconnect/dns-prefetch related functions
+- Add functions for updating page title and description
+- Add Trust Policy for setting/parsing HTML
+- Add scroll restoration handling
+- Add cancellable navigation events (`NavigationEvent`) which, if `event.preventDefault` is called on, cancel navigation
+- Add support for clearing registered routes
+- Add support for directly registering functions/constructor - Useful for dynamic routes and redirects
+
 ## [v1.0.3] - 2024-10-24
 
 ### Added

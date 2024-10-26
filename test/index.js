@@ -1,14 +1,69 @@
-import { init, navigate, back, forward, reload } from '@aegisjsproject/router';
+import { init, navigate, back, forward, reload, preload, dnsPrefetch, NAV_EVENT, registerPath } from '@aegisjsproject/router/router.js';
+import { observeEvents } from '@aegisjsproject/core/events.js';
 
-globalThis.controller = new AbortController();
+const controller = new AbortController();
+globalThis.controller = controller;
 
-init('#routes', {
+new CSSStyleSheet().replace(`
+	#nav {
+		position: sticky;
+		top: 0;
+	}
+`).then(styles => document.adoptedStyleSheets = [styles]);
+
+console.time('init');
+console.time('preload');
+
+registerPath('/foo/?foo=:foo', ({ matches, ...rest }) => {
+	console.log(rest);
+	return new URL(`${location.origin}/product/${matches.search.groups.foo}`);
+});
+
+document.addEventListener(NAV_EVENT, event => console.info(`${event.type} = ${event.reason} <${event.url}>`));
+
+// Object.values(EVENTS).forEach(event => {
+// 	document.addEventListener(event, requestCancel);
+// });
+
+const initialized = init('#routes', {
 	preload: document.documentElement.classList.contains('preload'),
 	notFound: '/test/views/404.js',
-	rootNode: '#root',
+	rootEl: '#root',
 	inteceptRoot: document.body,
 	signal: controller.signal,
-});
+}).finally(() => console.timeEnd('init'));
+
+Promise.all([
+	initialized,
+	preload('https://api.github.com/users/shgysk8zer0', {
+		as: 'fetch',
+		type: 'application/json',
+		referrerPolicy: 'no-referrer',
+		fetchPriority: 'low',
+	}),
+	preload('https://api.github.com/users/kernvalley', {
+		as: 'fetch',
+		type: 'application/json',
+		referrerPolicy: 'no-referrer',
+		fetchPriority: 'low',
+	}),
+	preload('https://avatars.githubusercontent.com/u/1627459?v=4', {
+		as: 'image',
+		type: 'image/png',
+		referrerPolicy: 'no-referrer',
+		fetchPriority: 'low',
+	}),
+	preload('https://avatars.githubusercontent.com/u/39509442?v=4', {
+		as: 'image',
+		type: 'image/png',
+		referrerPolicy: 'no-referrer',
+		fetchPriority: 'low',
+	}),
+	dnsPrefetch('https://baconipsum.com'),
+	dnsPrefetch('https://api.github.com'),
+	dnsPrefetch('https://avatars.githubusercontent.com'),
+	dnsPrefetch('https://img.shields.io')
+]).finally(() => console.timeEnd('preload'));
 
 document.querySelectorAll('[data-link]').forEach(el => {
 	el.addEventListener('click', ({ currentTarget }) => {
@@ -30,9 +85,12 @@ document.querySelectorAll('[data-nav]').forEach(el => {
 
 			case 'reload':
 				reload();
+				break;
 
 			default:
 				throw new TypeError(`Invalid nav button type: ${currentTarget.dataset.nav}.`);
 		}
 	}, { signal: controller.signal });
 });
+
+observeEvents();

@@ -12,5 +12,6 @@ export default [{
 		file: 'router.mjs',
 		format: 'esm',
 		plugins: [terser()],
+		sourcemap: true,
 	}],
 }];

@@ -65,12 +65,12 @@ or use an [importmap](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/
 
 ## Fundamentals
 
-At its core, this package matches URLs matching a `URLPattern` to modules to be dynamically
-imported. This yields a powerful but minimal package size, dynamic loading of "View"s as-needed,
-high reusability of code, and potentially nearly instant navigations, especially when used in
-conjunction with service workers and caches. Just create a script that has a `default` export
-that is a `Document`, `DocumentFragment`, `HTMLElement` and especially a custom element or
-web component, and map the `URLPattern`s to their respective modules.
+At its core, this package matches URLs matching a [`URLPattern`](https://developer.mozilla.org/en-US/docs/Web/API/URL_Pattern_API#pattern_syntax)
+to modules to be dynamically imported. This yields a powerful but minimal package size, dynamic
+loading of "View"s as-needed, high reusability of code, and potentially nearly instant navigations,
+especially when used in conjunction with service workers and caches. Just create a script that has a
+`default` export that is a `Document`, `DocumentFragment`, `HTMLElement` and especially a custom element
+or web component, and map the `URLPattern`s to their respective modules.
 
 ## Example
 
@@ -82,6 +82,7 @@ init({
   '/test/': '@scope/views/home.js',
   '/search?q=:query': '@scope/views/search.js',
   '/img': '/views/img.js',
+  '/path/page-:page(\\d+)': '@scope/foo.js',
 }, {
   preload: true, // Preload all registered modules
   notFound: './views/404.js', // Set custom 404 module
@@ -140,7 +141,10 @@ to avoid the default navigation, then calls `navigate(a.href)`.
 > root, it cannot reach into Shadow DOM. For any web component with shadow, you should call `interceptNav(shadow)`
 > in either the constructor or `connectedCallback`.
 
-
+## Cleanup
+For all "Views"/modules that export a function or constructor, they are given an `AbortSignal` which is aborted
+on any navigation. This can and should be used for any necessary cleanup/freeing up memory, such as aborting
+any pending requests and removing event listeners.
 
 ## 404 Pages
 You can register a module for 404 pages using either `set404()` or by passing it via `{ notFound }` in `init()`.
