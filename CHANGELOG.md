@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [v1.0.4] - 2024-10-28
+## [v1.0.5] - 2024-10-26
+
+### Fixed
+- Fix setting `rootEl` from string in `init()`
+
+## [v1.0.4] - 2024-10-26
 
 ### Added
 - Add `SearchParam` and `manageSearch` and `getSearch` for utilizing URL search params as state
