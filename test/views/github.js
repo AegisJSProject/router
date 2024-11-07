@@ -1,11 +1,15 @@
 import { manageState } from '@aegisjsproject/state';
+import { preconnect } from '@aegisjsproject/router/router.js';
+import { url } from '@aegisjsproject/url/url.js';
 
 const [users, setUsers] = manageState('github:users', {});
-const url = (strings, ...values) => String.raw(strings, ...values.map(val => encodeURIComponent(val)));
+// const url = (strings, ...values) => String.raw(strings, ...values.map(val => encodeURIComponent(val)));
+
+preconnect('https://api.github.com');
+preconnect('https://avatars.githubusercontent.com');
 
 export default async ({ matches, signal }) => {
 	const username = matches?.pathname?.groups?.username;
-
 	if (typeof username !== 'string') {
 		return `<p>Error: No GitHub username provided.</p>`;
 	} else if (! (username in users)) {

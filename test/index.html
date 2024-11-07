@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr" class="preload">
+<html lang="en" dir="ltr" class="preload-x">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width" />
 		<meta name="color-scheme" content="light dark" />
-		<title>AegisJSProject State Management</title>
+		<title>AegisJSProject Router</title>
 		<base href="/test/" />
 		<script type="importmap">
 			{
@@ -13,7 +13,7 @@
 					"@aegisjsproject/router": "../router.mjs",
 					"@aegisjsproject/router/": "../",
 					"@aegisjsproject/state": "../node_modules/@aegisjsproject/state/state.js",
-					"@aegisjsproject/state": "../node_modules/@aegisjsproject/state/state.mjs",
+					"@aegisjsproject/state/": "../node_modules/@aegisjsproject/state/",
 					"@highlightjs/cdn-assets/": "https://unpkg.com/@highlightjs/cdn-assets@11.10.0/es/",
 					"@aegisjsproject/markdown/": "https://unpkg.com/@aegisjsproject/markdown@0.1.3/",
 					"marked": "https://unpkg.com/marked@14.1.2/lib/marked.esm.js",
@@ -29,7 +29,7 @@
 		<script type="application/javascript" defer="" referrerpolicy="no-referrer" fetchpriority="auto" crossorigin="anonymous" integrity="sha384-1saT/U4nXVBbxQeMGiDxcWp3S9u8rT3rkBuRH7vV0DsGqV6jqGPp6ZNEEvsIWpWQ" src="https://unpkg.com/@shgysk8zer0/polyfills@0.4.5/all.min.js"></script>
 		<script type="module" src="./index.js"></script>
 		<!-- <script src="./index.min.js" defer=""></script> -->
-		<script type="application/json" id="routes">
+		<!-- <script type="application/json" id="routes">
 			{
 				"/product/:productId": "/test/views/product.js",
 				"/page/markdown": "/test/views/markdown.js",
@@ -39,41 +39,38 @@
 				"/page/bacon/:lines(\\d+)": "/test/views/bacon.js",
 				"/github/:username(\\w+)": "/test/views/github.js"
 			}
-		</script>
-		<!-- <script type="application/json" id="routes">
+		</script> -->
+		<script type="application/json" id="routes">
 			{
 				"/product/:productId": "@views/product.js",
 				"/page/markdown": "@views/markdown.js",
 				"/test/": "@views/home.js",
 				"/search?q=:query": "@views/search.js",
 				"/img": "@views/img.js",
-				"/page/bacon/:lines": "@views/bacon.js",
-				"/github/:username": "@views/github.js",
-				"/foo": "dne"
+				"/page/bacon/:lines(\\d+)": "@views/bacon.js",
+				"/github/:username(\\w+)": "@views/github.js"
 			}
-		</script> -->
-		 <!-- <script>
-			import('./index.js').then(console.log, console.error);
-		 </script> -->
+		</script>
 	</head>
 	<body>
-		<nav id="nav">
-			<button type="button" class="btn btn-primary" data-nav="back" accesskey="&gt;">Back</button>
-			<button type="button" class="btn btn-primary" data-link="/test/" accesskey="h">Home</button>
-			<button type="button" class="btn btn-primary" data-nav="forward" accesskey="&lt;">Forward</button>
+		<nav id="nav" class="sticky top z-4 flex wrap">
+			<button type="button" class="btn btn-primary" data-nav="back" accesskey="&lt;">Back</button>
+			<a class="btn btn-link" href="/test/" accesskey="h">Home</a>
+			<button type="button" class="btn btn-primary" data-nav="forward" accesskey="&gt;">Forward</button>
 			<button type="button" class="btn btn-primary" data-nav="reload" accesskey="r">Reload</button>
-			<a href="/test/views/" class="btn btn-primary">HTML Page</a>
-			<button type="button" class="btn btn-primary" data-link="/product/1" data-name="Product 1" accesskey="1">Product 1</button>
-			<button type="button" class="btn btn-primary" data-link="/product/2" data-name="Product 2" accesskey="2">Product 2</button>
-			<a href="/product/3" class="btn btn-primary" accesskey="3">Product 3</a>
-			<a href="/page/markdown" class="btn btn-primary" accesskey="m">Markdown Test</a>
-			<a href="/page/bacon/3" class="btn btn-primary">Bacon Ipsum (3 lines)</a>
-			<a href="/page/bacon/5" class="btn btn-primary" accesskey="b">Bacon Ipsum (5 lines)</a>
-			<a href="/github/shgysk8zer0" class="btn btn-primary" accesskey="g">shgysk8zer0 on GitHub</a>
-			<a href="/github/kernvalley" class="btn btn-primary">kernvalley on GitHub</a>
-			<button type="button" class="btn btn-primary" data-link="/search?q=shoes" accesskey="?">Search for Shoes</button>
-			<button type="button" class="btn btn-primary" data-link="/img" accesskey="i">Random Image</button>
-			<button type="button" class="btn btn-primary" data-link="/dne" accesskey="x">404 Page</button>
+			<a href="/test/views/" class="btn btn-link">HTML Page</a>
+			<a class="btn btn-link" href="/product/1" data-aegis-state-name="Product 1" data-integrity="sha384-Ui67sXj4cxjVmJ6xRYmzMg7TEjlMgFUDN0WI053Lt+Uru8E9gFUDs2P2Y14gnDwa" data-aegis-state-foo="bar" accesskey="1">Product 1</a>
+			<a class="btn btn-link" href="/product/2" data-aegis-state-name="Product 2" data-integrity="sha384-Ui67sXj4cxjVmJ6xRYmzMg7TEjlMgFUDN0WI053Lt+Uru8E9gFUDs2P2Y14gnDwa" accesskey="2">Product 2</a>
+			<a href="/product/3" class="btn btn-link" data-aegis-state-name="Product 3" data-integrity="sha384-Ui67sXj4cxjVmJ6xRYmzMg7TEjlMgFUDN0WI053Lt+Uru8E9gFUDs2P2Y14gnDwa" accesskey="3">Product 3</a>
+			<a href="/page/markdown" class="btn btn-link" accesskey="m">Markdown Test</a>
+			<!-- <a href="/page/bacon/3" class="btn btn-primary">Bacon Ipsum (3 lines)</a> -->
+			<a href="/page/bacon/5" class="btn btn-link" accesskey="b">Bacon Ipsum (5 lines)</a>
+			<a href="/github/shgysk8zer0" class="btn btn-link" accesskey="g">shgysk8zer0 on GitHub</a>
+			<a href="/github/kernvalley" class="btn btn-link">kernvalley on GitHub</a>
+			<a href="/test/views/" class="btn btn-link no-router">Native</a>
+			<a class="btn btn-link" href="/search?q=shoes" accesskey="?">Search for Shoes</a>
+			<a class="btn btn-link" href="/img" accesskey="i">Random Image</a>
+			<a class="btn btn-link" href="/dne" accesskey="x">404 Page</a>
 		</nav>
 		<div id="root">
 			<stateful-el></stateful-el>

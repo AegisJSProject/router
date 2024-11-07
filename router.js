@@ -1,16 +1,20 @@
 import { getStateObj, diffState, notifyStateChange } from '@aegisjsproject/state';
+export { url } from '@aegisjsproject/url/url.js';
+import { EVENTS } from '@aegisjsproject/core/events.js';
 
 const isModule = ! (document.currentScript instanceof HTMLScriptElement);
-const supportsImportmap = HTMLScriptElement.supports('importmap');
+const SUPPORTS_IMPORTMAP = HTMLScriptElement.supports('importmap');
 const registry = new Map();
 const NO_BODY_METHODS = ['GET', 'HEAD', 'DELETE', 'OPTIONS'];
 const DESC_SELECTOR = 'meta[name="description"], meta[itemprop="description"], meta[property="og:description"], meta[name="twitter:description"]';
 const mutObserver = new MutationObserver(entries => entries.forEach(entry => interceptNav(entry.target)));
 const ROOT_ID = 'root';
+const EVENT_TARGET = document;
 let rootEl = document.getElementById(ROOT_ID) ?? document.body;
 let rootSelector = '#' + ROOT_ID;
 
 export const NAV_EVENT = 'aegis:navigate';
+
 export const EVENT_TYPES = {
 	navigate: 'aegis:router:navigate',
 	back: 'aegis:router:back',
@@ -26,7 +30,7 @@ export class NavigationEvent extends CustomEvent {
 	#reason;
 	#url;
 
-	constructor(name = NAV_EVENT, reason = 'unknown', { bubbles = true, cancelable = true, detail = {
+	constructor(name = NAV_EVENT, reason = 'unknown', { bubbles = false, cancelable = true, detail = {
 		oldState: getStateObj(),
 		oldURL: new URL(location.href),
 	} } = {}) {
@@ -65,11 +69,10 @@ async function _popstateHandler(event) {
 		detail: { newState: event.state, oldState: null, oldURL: new URL(location.href), method: 'GET', formData: null },
 	});
 
-	rootEl.dispatchEvent(navigate);
+	EVENT_TARGET.dispatchEvent(navigate);
 
 	if (! navigate.defaultPrevented) {
 		_updatePage(content);
-		rootEl.dispatchEvent(new Event(EVENT_TYPES.load));
 	}
 };
 
@@ -90,11 +93,11 @@ function _loadLink(href, {
 	integrity,
 	media,
 	type,
-}) {
+} = {}) {
 	const { promise, resolve, reject } = Promise.withResolvers();
 	const link = document.createElement('link');
 
-	if (passedSignal.aborted) {
+	if (passedSignal instanceof AbortSignal && passedSignal.aborted) {
 		reject(passedSignal.reason);
 	} else {
 		link.relList.add(...relList);
@@ -182,7 +185,7 @@ function _isModuleURL(src) {
 function _resolveModule(src) {
 	if (_isModuleURL(src)) {
 		return URL.parse(src, document.baseURI);
-	} else if (! supportsImportmap) {
+	} else if (! SUPPORTS_IMPORTMAP) {
 		throw new TypeError('Importmaps and module specifiers are not supported');
 	} else if (! isModule) {
 		throw new TypeError('Cannot resolve a module specifier outside of a module script.');
@@ -191,15 +194,28 @@ function _resolveModule(src) {
 	}
 }
 
+function _getLinkStateData(a) {
+	const entries = Object.entries(a.dataset)
+		.filter(([name]) => name.startsWith('aegisState'))
+		.map(([name, value]) => [name[10].toLowerCase() + name.substring(11), value]);
+
+	return Object.fromEntries(entries);
+}
+
 function _interceptLinkClick(event) {
-	if (event.isTrusted && event.currentTarget.href.startsWith(location.origin)) {
+	if (event.target.classList.contains('no-router') || event.target.hasAttribute(EVENTS.onClick)) {
+		event.target.removeEventListener(_interceptLinkClick);
+	} else if (event.isTrusted && event.currentTarget.href.startsWith(location.origin)) {
 		event.preventDefault();
-		navigate(event.currentTarget.href);
+		const state = _getLinkStateData(event.currentTarget);
+		navigate(event.currentTarget.href, state, { integrity: event.currentTarget.dataset.integrity });
 	}
 };
 
 async function _interceptFormSubmit(event) {
-	if (event.isTrusted && event.target.action.startsWith(location.origin)) {
+	if (event.target.classList.contains('no-router') || event.target.hasAttribute(EVENTS.onSubmit)) {
+		event.target.removeEventListener('submit', _interceptFormSubmit);
+	} else if (event.isTrusted && event.target.action.startsWith(location.origin)) {
 		event.preventDefault();
 		const { method, action } = event.target;
 		const formData = new FormData(event.target);
@@ -208,7 +224,7 @@ async function _interceptFormSubmit(event) {
 			detail: { oldState: getStateObj(), oldURL: new URL(location.href), formData },
 		});
 
-		document.dispatchEvent(submit);
+		EVENT_TARGET.dispatchEvent(submit);
 
 		if (submit.defaultPrevented) {
 			return;
@@ -227,12 +243,13 @@ async function _interceptFormSubmit(event) {
 	}
 }
 
-async function _getHTML(url, { signal, method = 'GET', body } = {}) {
+async function _getHTML(url, { signal, method = 'GET', body, integrity } = {}) {
 	const resp = await fetch(url, {
 		method,
 		body: NO_BODY_METHODS.includes(method.toUpperCase()) ? null : body,
 		headers: { 'Accept': 'text/html' },
 		referrerPolicy: 'no-referrer',
+		integrity,
 		signal,
 	}).catch(err => err);
 
@@ -274,9 +291,11 @@ function _updatePage(content) {
 	} else if (! (content === null || typeof content === 'undefined')) {
 		rootEl.textContent = content;
 	}
+
+	EVENT_TARGET.dispatchEvent(new NavigationEvent(NAV_EVENT, EVENT_TYPES.load, { cancelable: false }));
 }
 
-async function _handleModule(moduleSrc, args = {}) {
+async function _handleModule(moduleSrc, { state = getStateObj(), ...args } = {}) {
 	const module = await Promise.try(() => {
 		if (moduleSrc instanceof Function) {
 			return moduleSrc(args);
@@ -290,13 +309,10 @@ async function _handleModule(moduleSrc, args = {}) {
 	}).catch(err => err);
 
 	const url = new URL(location.href);
-	const state = getStateObj();
 	const timestamp = performance.now();
 
-	if (args.signal instanceof AbortSignal && args.signal.aborted) {
-		return args.signal.reason.message;
-	} else if (module instanceof URL) {
-		await navigate(module);
+	if (module instanceof URL) {
+		await navigate(module, state, args);
 	} else if (module instanceof Error) {
 		return module.message;
 	} else if (! ('default' in module)) {
@@ -313,6 +329,7 @@ async function _handleModule(moduleSrc, args = {}) {
 			url,
 			state,
 			timestamp,
+			signal: getNavSignal(),
 			...args
 		});
 	} else if (module.default instanceof Function) {
@@ -320,6 +337,7 @@ async function _handleModule(moduleSrc, args = {}) {
 			url,
 			state,
 			timestamp,
+			signal: getNavSignal(),
 			...args
 		});
 	} else if (module.default instanceof Node || module.default instanceof Error) {
@@ -344,12 +362,13 @@ let view404 = ({ url = location, method = 'GET' }) => {
 	return div;
 };
 
-async function _get404(url = location, method = 'GET', { signal, formData } = {}) {
+async function _get404(url = location, method = 'GET', { signal, formData, integrity } = {}) {
 	const timestamp = performance.now();
+
 	if (typeof view404 === 'string') {
-		return await _handleModule(view404, { url, matches: null, signal, method, formData, timestamp });
+		return await _handleModule(view404, { url, matches: null, signal, method, formData, timestamp, integrity });
 	} else if (view404 instanceof Function) {
-		_updatePage(view404({ timestamp, state: getStateObj(), url, matches: null, signal, method, formData }));
+		_updatePage(view404({ timestamp, state: getStateObj(), url, matches: null, signal, method, formData, integrity }));
 	}
 }
 
@@ -470,24 +489,24 @@ export function interceptNav(target = document.body, { signal } = {}) {
 		interceptNav(document.querySelector(target), { signal });
 	} else if (! (target instanceof HTMLElement)) {
 		throw new TypeError('Cannot intercept navigation on a non-Element. Element or selector is required.');
-	} else if (target.tagName === 'A' && target.href.startsWith(location.origin)) {
+	} else if (target.tagName === 'A' && ! target.classList.contains('no-router') && ! target.hasAttribute(EVENTS.onClick) && target.href.startsWith(location.origin)) {
 		target.addEventListener('click', _interceptLinkClick, { signal, passive: false });
-	} else if (target.tagName === 'FORM' && target.action.startsWith(location.origin)) {
+	} else if (target.tagName === 'FORM' && ! target.classList.contains('no-router') && ! target.hasAttribute(EVENTS.onSubmit) && target.action.startsWith(location.origin)) {
 		target.addEventListener('submit', _interceptFormSubmit, { signal, passive: false });
 
-		target.querySelectorAll('a[href]:not([rel~="external"])').forEach(el => {
+		target.querySelectorAll(`a[href]:not([rel~="external"], .no-router, [${EVENTS.onClick}])`).forEach(el => {
 			if (el.href.startsWith(location.origin)) {
 				el.addEventListener('click', _interceptLinkClick, { passive: false, signal });
 			}
 		});
 	} else {
-		target.querySelectorAll('a[href]:not([rel~="external"])').forEach(el => {
+		target.querySelectorAll(`a[href]:not([rel~="external"], .no-router, [${EVENTS.onClick}])`).forEach(el => {
 			if (el.href.startsWith(location.origin)) {
 				el.addEventListener('click', _interceptLinkClick, { passive: false, signal });
 			}
 		});
 
-		target.querySelectorAll('form').forEach(el => {
+		target.querySelectorAll(`form:not(.no-router, [${EVENTS.onSubmit}])`).forEach(el => {
 			el.addEventListener('submit', _interceptFormSubmit, { passive: false, signal });
 		});
 	}
@@ -531,6 +550,51 @@ export function observeLinksOn(target = document.body, { signal } = {}) {
 	} else {
 		throw new TypeError('Cannot observe link on a non-Element. Requires an Element or selector.');
 	}
+}
+
+/**
+ * Creates a URLPattern object from the given path and base URL.
+ *
+ * @param {string|URL|URLPattern} path - The path to create the pattern from.
+ * @param {string} [baseURL=location.origin] - The base URL to use for relative paths. Defaults to the current origin.
+ * @returns {URLPattern|RegExp|null} - The created URLPattern object, or `null` if the input is invalid.
+ */
+export function getURLPattern(path, baseURL = location.origin) {
+	if (path instanceof URLPattern) {
+		return path;
+	} else if (typeof path === 'string') {
+		return new URLPattern(path, baseURL);
+	} else if (path instanceof URL) {
+		return new URLPattern(path.href);
+	} else {
+		return null;
+	}
+}
+
+/**
+ * Extracts a specific parameter value from a URL path.
+ *
+ * @param {string|URL|URLPattern} path - The path to extract the parameter from.
+ * @param {string} param - The name of the parameter to extract.
+ * @param {object} [options] - Optional options.
+ *   - `fallbackValue` {string} - The default value to return if the parameter is not found.
+ *   - `baseURL` {string} - The base URL to use for relative paths.
+ * @returns {object} - An object with a `toString()` method to retrieve the parameter value as a string, and a `[Symbol.toPrimitive]()` method to convert it to a number or string.
+ */
+export function getURLPath(path, param, {
+	fallbackValue = '',
+	baseURL = location.origin,
+} = {}) {
+	const pattern = getURLPattern(path, baseURL);
+
+	return Object.freeze({
+		toString() {
+			return pattern.exec(location.href)?.pathname.groups?.[param] ?? fallbackValue;
+		},
+		[Symbol.toPrimitive](hint = 'default') {
+			return hint === 'number' ? parseFloat(this.toString()) : this.toString();
+		}
+	});
 }
 
 /**
@@ -587,26 +651,34 @@ export function clearPaths() {
  * @returns {Promise<string|void>} - A promise that resolves with the module content or triggers navigation if a path match is found.
  * @throws {Error} - Throws an error if the input is null or cannot be parsed as a URL.
  */
-export async function getModule(input = location, { signal, method = 'GET', formData = new FormData() } = {}) {
+export async function getModule(input = location, {
+	method = 'GET',
+	state = getStateObj(),
+	formData = new FormData(),
+	integrity,
+	signal,
+} = {}) {
 	const timestamp = performance.now();
 
 	if (input === null) {
 		throw new Error('Invalid path.');
 	} else if (! (input instanceof URL)) {
-		return await getModule(URL.parse(input, document.baseURI), { signal, method, formData });
+		return await getModule(URL.parse(input, document.baseURI), { signal, method, formData, state, integrity });
 	} else {
 		const match = findPath(input);
 
 		if (! (match instanceof URLPattern)) {
-			return await _getHTML(input, { method, signal: getNavSignal({ signal }), body: formData });
+			return await _getHTML(input, { method, signal: getNavSignal({ signal }), body: formData, state, integrity });
 		} else {
 			const handler = registry.get(match);
 			return await _handleModule(handler, {
 				url: input,
 				matches: match.exec(input),
-				signal: getNavSignal({ signal }),
+				state,
+				// signal: getNavSignal({ signal }),
 				method,
 				formData,
+				integrity,
 				timestamp,
 			});
 		}
@@ -628,13 +700,14 @@ export async function navigate(url, newState = getStateObj(), {
 	signal,
 	method = 'GET',
 	formData,
+	integrity,
 } = {}) {
 	if (url === null) {
 		throw new TypeError('URL cannot be null.');
 	} else if (signal instanceof AbortSignal && signal.aborted) {
 		throw signal.reason;
 	} else if (! (url instanceof URL)) {
-		return await navigate(URL.parse(url, document.baseURI), newState, { signal, method, formData });
+		return await navigate(URL.parse(url, document.baseURI), newState, { signal, method, formData, integrity });
 	} else if (formData instanceof FormData && NO_BODY_METHODS.includes(method.toUpperCase())) {
 		const params = new URLSearchParams(formData);
 
@@ -642,7 +715,7 @@ export async function navigate(url, newState = getStateObj(), {
 			url.searchParams.append(key, val);
 		}
 
-		return await navigate(url, newState, { signal, method });
+		return await navigate(url, newState, { signal, method, integrity });
 	} else if (url.href !== location.href) {
 		try {
 			const oldState = getStateObj();
@@ -651,13 +724,12 @@ export async function navigate(url, newState = getStateObj(), {
 				detail: { newState, oldState, oldURL: new URL(location.href), newURL: url, method, formData },
 			});
 
-			rootEl.dispatchEvent(navigate);
+			EVENT_TARGET.dispatchEvent(navigate);
 
 			if (! navigate.defaultPrevented) {
 				history.pushState(newState, '', url);
+				const content = await getModule(url, { signal, method, formData, state: newState, integrity });
 				await notifyStateChange(diff);
-				const content = await getModule(url, { signal, method, formData });
-
 				_updatePage(content);
 
 				return content;
@@ -676,7 +748,7 @@ export async function navigate(url, newState = getStateObj(), {
  */
 export function back() {
 	const event = new NavigationEvent(NAV_EVENT, EVENT_TYPES.back);
-	rootEl.dispatchEvent(event);
+	EVENT_TARGET.dispatchEvent(event);
 
 	if (! event.defaultPrevented) {
 		history.back();
@@ -688,7 +760,7 @@ export function back() {
  */
 export function forward() {
 	const event = new NavigationEvent(NAV_EVENT, EVENT_TYPES.forward);
-	rootEl.dispatchEvent(event);
+	EVENT_TARGET.dispatchEvent(event);
 
 	if (! event.defaultPrevented) {
 		history.forward();
@@ -702,7 +774,7 @@ export function forward() {
  */
 export function go(delta = 0) {
 	const event = new NavigationEvent(NAV_EVENT, EVENT_TYPES.go);
-	rootEl.dispatchEvent(event);
+	EVENT_TARGET.dispatchEvent(event);
 
 	if (! event.defaultPrevented) {
 		history.go(delta);
@@ -714,7 +786,7 @@ export function go(delta = 0) {
  */
 export function reload() {
 	const event = new NavigationEvent(NAV_EVENT, EVENT_TYPES.reload);
-	rootEl.dispatchEvent(event);
+	EVENT_TARGET.dispatchEvent(event);
 
 	if (! event.defaultPrevented) {
 		history.go(0);
@@ -854,8 +926,6 @@ export async function init(routes, {
 			}
 		});
 	}
-
-	rootEl.dispatchEvent(new NavigationEvent(NAV_EVENT, EVENT_TYPES.load));
 
 	return getNavSignal({ signal });
 }
@@ -1010,17 +1080,14 @@ export async function dnsPrefetch(href) {
  */
 export function getNavController({ signal, passive } = {}) {
 	const controller = new AbortController();
-	const callback = (event) => {
-		if (! event.defaultPrevented) {
+	const callback = event => {
+		// load & pop events occur after navigation
+		if (! event.defaultPrevented && event.reason !== EVENT_TYPES.load && event.reason !== EVENT_TYPES.pop) {
 			controller.abort(`Navigated away from ${location.href}.`);
 		}
 	};
 
-	const opts = signal instanceof AbortSignal
-		? { signal: AbortSignal.any([signal, controller.signal ]), once: true, passive }
-		: { signal: controller.signal, once: true, passive };
-
-	document.addEventListener(NAV_EVENT, callback, opts);
+	EVENT_TARGET.addEventListener(NAV_EVENT, callback, { signal, passive });
 
 	return controller;
 }
@@ -1037,7 +1104,8 @@ export function getNavController({ signal, passive } = {}) {
  */
 export function getNavSignal({ signal, passive } = {}) {
 	const controller = getNavController({ signal, passive });
-	return signal instanceof AbortSignal ? AbortSignal.any([signal, controller.signal]) :controller.signal;
+
+	return signal instanceof AbortSignal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
 }
 
 /**
@@ -1073,4 +1141,70 @@ export async function whenNavigated({ signal, passive } = {}) {
 			return promise;
 		}
 	}
+}
+
+/**
+ * Preloads resources associated with an element or selector when hovered over, with optional configuration.
+ *
+ * @param {string|HTMLElement} target - A CSS selector string or an HTMLElement that triggers preloading.
+ * @param {object} [options={}] - Configuration options for preloading.
+ * @param {string} [options.crossOrigin='anonymous'] - The cross-origin attribute for the request, useful for fetching from other origins.
+ * @param {string} [options.referrerPolicy='no-referrer'] - The referrer policy to apply to the request.
+ * @param {string} [options.fetchPriority='high'] - The priority level of the fetch operation.
+ * @param {AbortSignal} [options.signal] - Optional signal to abort the preload operation if needed.
+ * @returns {Promise<void>} A promise that resolves once preloading completes.
+ * @throws {TypeError} Throws if the target is not a valid selector or an HTMLElement with a valid `href` attribute.
+ */
+export async function preloadOnHover(target, {
+	crossOrigin = 'anonymous',
+	referrerPolicy = 'no-referrer',
+	fetchPriority = 'high',
+	signal,
+} = {}) {
+	const { resolve, reject, promise } = Promise.withResolvers();
+
+	if (typeof target === 'string') {
+		await Promise.all(Array.from(
+			document.querySelectorAll(target),
+			link => preloadOnHover(link)
+		)).then(resolve, reject);
+	} else if (
+		target instanceof HTMLElement
+		&& ! target.classList.contains('no-router')
+		&& typeof target.href === 'string'
+		&& target.origin === location.origin
+		&& URL.canParse(target.href)
+	) {
+		target.addEventListener('mouseenter', async ({ target }) => {
+			const pattern = findPath(target.href);
+
+			if (pattern instanceof URLPattern) {
+				await preloadModule(registry.get(pattern), {
+					fetchPriority,
+					referrerPolicy,
+					crossOrigin,
+					integrity: target.dataset.integrity,
+					signal,
+				});
+				resolve();
+			} else {
+				await preload(target.href, {
+					fetchPriority,
+					crossOrigin,
+					referrerPolicy,
+					as: target.dataset.preloadAs ?? 'fetch',
+					type: target.dataset.preloadType ?? 'text/html',
+					integrity: target.dataset.integrity,
+					signal,
+				});
+				resolve();
+			}
+		}, { once: true, passive: true, signal });
+	} else if (! (target instanceof HTMLElement && target.classList.contains('no-router'))) {
+		reject(new TypeError('Preload target must be a selector or an element with an `href` atttribute.'));
+	} else {
+		resolve();
+	}
+
+	await promise;
 }
