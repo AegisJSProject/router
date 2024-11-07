@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.0.6] - 2024-11-07
+
+### Added
+- Add `preloadOnHover` to preload before click, upon hover indicator
+- Add ability to prevent adding click/submit handlers
+- Create functions to simplify working with `URLPattern`
+
+### Changed
+- Overhaul `aegis:navigate` events
+
+### Fixed
+- Fix navigation controller nav listener being aborted too early
+
 ## [v1.0.5] - 2024-10-26
 
 ### Fixed

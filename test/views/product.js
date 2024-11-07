@@ -1,3 +1,7 @@
+import { getState } from '@aegisjsproject/state';
+
+const product = getState('name', 'Unknown');
+
 class ProductView extends HTMLElement {
 	#shadow;
 
@@ -6,11 +10,15 @@ class ProductView extends HTMLElement {
 
 		if (this.shadowRoot === null) {
 			this.#shadow = this.attachShadow({ mode: 'open', clonable: true, serializable: true });
+			const h1 = document.createElement('h1');
 			const pre = document.createElement('pre');
 			const code = document.createElement('code');
+
 			code.textContent = JSON.stringify(params, null, 4);
+			const productName = product.toString();
+			h1.textContent = `Product Search results for ${productName}`;
 			pre.append(code);
-			this.#shadow.append(pre);
+			this.#shadow.append(h1, pre);
 		} else {
 			this.#shadow = this.shadowRoot;
 		}

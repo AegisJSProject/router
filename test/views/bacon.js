@@ -1,7 +1,11 @@
 // import { html } from '@aegisjsproject/core/parsers/html.js';
 import { manageState } from '@aegisjsproject/state';
+import { preconnect, getURLPath } from '@aegisjsproject/router/router.js';
 
 const [ipsum, setIpsum] = manageState('bacon:ipsum', []);
+const numLines = getURLPath('/page/bacon/:lines(\\d+)', 'lines', { fallbackValue: 5 });
+
+preconnect('https://baconipsum.com');
 
 export default class BaconIpsum extends HTMLElement {
 	#shadow;
