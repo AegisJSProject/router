@@ -4,14 +4,26 @@ import { EVENTS } from '@aegisjsproject/core/events.js';
 
 const isModule = ! (document.currentScript instanceof HTMLScriptElement);
 const SUPPORTS_IMPORTMAP = HTMLScriptElement.supports('importmap');
-const registry = new Map();
+const ROUTES_REGISTRY = new Map();
 const NO_BODY_METHODS = ['GET', 'HEAD', 'DELETE', 'OPTIONS'];
 const DESC_SELECTOR = 'meta[name="description"], meta[itemprop="description"], meta[property="og:description"], meta[name="twitter:description"]';
-const mutObserver = new MutationObserver(entries => entries.forEach(entry => interceptNav(entry.target)));
+const navObserver = new MutationObserver(entries => entries.forEach(entry => interceptNav(entry.target)));
+const preloadObserver = new MutationObserver(entries => entries.forEach(_handlePreloadMutations));
 const ROOT_ID = 'root';
 const EVENT_TARGET = document;
+const NAV_CLOSE_SYMBOL = Symbol.for('aegis:navigate:event:close');
 let rootEl = document.getElementById(ROOT_ID) ?? document.body;
 let rootSelector = '#' + ROOT_ID;
+
+function _handlePreloadMutations(target) {
+	if (target instanceof MutationRecord) {
+		_handlePreloadMutations(target.target);
+	} else if (target.tagName === 'A' && ! target.classList.contains('no-router') && ! target.hasAttribute(EVENTS.onClick)) {
+		preloadOnHover(target);
+	} else {
+		target.querySelectorAll(`a:not(.no-router, [${EVENTS.onClick}])`).forEach(a => preloadOnHover(a));
+	}
+}
 
 export const NAV_EVENT = 'aegis:navigate';
 
@@ -26,9 +38,12 @@ export const EVENT_TYPES = {
 	submit: 'aegis:router:submit',
 };
 
-export class NavigationEvent extends CustomEvent {
+export class AegisNavigationEvent extends CustomEvent {
 	#reason;
 	#url;
+	#controller = new AbortController();
+	#promises = [];
+	#errors = [];
 
 	constructor(name = NAV_EVENT, reason = 'unknown', { bubbles = false, cancelable = true, detail = {
 		oldState: getStateObj(),
@@ -39,20 +54,96 @@ export class NavigationEvent extends CustomEvent {
 		this.#url = location.href;
 	}
 
+	get aborted() {
+		return this.#controller.signal.aborted;
+	}
+
+	get error() {
+		switch(this.#errors.length) {
+			case 0:
+				return null;
+
+			case 1:
+				return this.#errors[0];
+
+			default:
+				return new AggregateError(this.#errors);
+		}
+	}
+
 	get reason() {
 		return this.#reason;
+	}
+
+	get signal() {
+		return this.#controller.signal;
 	}
 
 	get url() {
 		return this.#url;
 	}
 
-	async cancel({ signal } = {}) {
-		return navigate(this.detail.oldURL, this.detail.oldState, { signal });
+	async [NAV_CLOSE_SYMBOL]() {
+		const result = await Promise.allSettled(this.#promises).then(results => {
+			this.#errors.push(...results.filter(result => result.status === 'rejected').map(result => result.reason));
+
+			return this.cancelable && this.defaultPrevented;
+		});
+
+		this.#controller.abort();
+		return result;
+	}
+
+	abort(reason) {
+		this.#controller.abort(reason);
+	}
+
+	waitUntil(promiseOrCallback, { signal = AbortSignal.timeout(500) } = {}) {
+		const { promise, resolve, reject } = Promise.withResolvers();
+
+		this.#promises.push(promise);
+
+		if (signal instanceof AbortSignal && ! signal.aborted) {
+			signal.addEventListener('abort', ({ target }) =>{
+				reject(target.reason);
+
+				if (this.cancelable && ! this.defaultPrevented) {
+					super.preventDefault();
+				}
+			}, {
+				once: true,
+				signal: this.#controller.signal,
+			});
+		}
+
+		if (this.#controller.signal.aborted) {
+			reject(this.#controller.signal.reason);
+		} else if (signal instanceof AbortSignal && signal.aborted) {
+			reject(signal.reason);
+
+			if (this.cancelable && ! this.defaultPrevented) {
+				super.preventDefault();
+			}
+		} else if (! this.defaultPrevented && promiseOrCallback instanceof Function) {
+			Promise.try(() => promiseOrCallback(this, {
+				signal: signal instanceof AbortSignal ? AbortSignal.any([signal, this.#controller.signal]) : this.#controller.signal,
+				timestamp: performance.now()
+			})).then(resolve, reject);
+		} else if (! this.defaultPrevented && promiseOrCallback instanceof Promise) {
+			promiseOrCallback.then(resolve, reject);
+		}
 	}
 
 	[Symbol.toStringTag]() {
 		return 'NavigationEvent';
+	}
+
+	static get defaultType() {
+		return NAV_EVENT;
+	}
+
+	static get reasons() {
+		return EVENT_TYPES;
 	}
 }
 
@@ -65,13 +156,13 @@ async function _popstateHandler(event) {
 	const diff = diffState(event.state ?? {});
 	await notifyStateChange(diff);
 	const content = await getModule(new URL(location.href));
-	const navigate = new NavigationEvent(NAV_EVENT, EVENT_TYPES.pop, {
+	const navigate = new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.pop, {
 		detail: { newState: event.state, oldState: null, oldURL: new URL(location.href), method: 'GET', formData: null },
 	});
 
 	EVENT_TARGET.dispatchEvent(navigate);
 
-	if (! navigate.defaultPrevented) {
+	if (! await navigate[NAV_CLOSE_SYMBOL]()) {
 		_updatePage(content);
 	}
 };
@@ -220,13 +311,13 @@ async function _interceptFormSubmit(event) {
 		const { method, action } = event.target;
 		const formData = new FormData(event.target);
 
-		const submit = new NavigationEvent(NAV_EVENT, EVENT_TYPES.submit, {
+		const submit = new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.submit, {
 			detail: { oldState: getStateObj(), oldURL: new URL(location.href), formData },
 		});
 
 		EVENT_TARGET.dispatchEvent(submit);
 
-		if (submit.defaultPrevented) {
+		if (await submit[NAV_CLOSE_SYMBOL]()) {
 			return;
 		} else if (NO_BODY_METHODS.includes(method.toUpperCase())) {
 			const url = new URL(action);
@@ -292,7 +383,7 @@ function _updatePage(content) {
 		rootEl.textContent = content;
 	}
 
-	EVENT_TARGET.dispatchEvent(new NavigationEvent(NAV_EVENT, EVENT_TYPES.load, { cancelable: false }));
+	EVENT_TARGET.dispatchEvent(new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.load, { cancelable: false }));
 }
 
 async function _handleModule(moduleSrc, { state = getStateObj(), ...args } = {}) {
@@ -468,7 +559,7 @@ export function manageSearch(key, fallbackValue = '', onChange, { signal, passiv
  * @param {string|URL} input - The input URL or path.
  * @returns {URLPattern|undefined} - The matching URL pattern, or undefined if no match is found.
  */
-export const findPath = input => registry.keys().find(pattern => pattern.test(input));
+export const findPath = input => ROUTES_REGISTRY.keys().find(pattern => pattern.test(input));
 
 /**
  * Sets the 404 handler.
@@ -480,18 +571,18 @@ export const set404 = path => view404 = path;
 /**
  * Intercepts navigation events within a target element.
  *
- * @param {HTMLElement|string} target - The element to intercept navigation events on. Defaults to document.body.
+ * @param {HTMLElement|ShadowRoot|string} target - The element to intercept navigation events on. Defaults to document.body.
  * @param {Object} [options] - Optional options.
  * @param {AbortSignal} [options.signal] - An AbortSignal to cancel the interception.
  */
 export function interceptNav(target = document.body, { signal } = {}) {
 	if (typeof target === 'string') {
 		interceptNav(document.querySelector(target), { signal });
-	} else if (! (target instanceof HTMLElement)) {
+	} else if (! (target instanceof HTMLElement || target instanceof ShadowRoot)) {
 		throw new TypeError('Cannot intercept navigation on a non-Element. Element or selector is required.');
-	} else if (target.tagName === 'A' && ! target.classList.contains('no-router') && ! target.hasAttribute(EVENTS.onClick) && target.href.startsWith(location.origin)) {
+	} else if (target instanceof HTMLAnchorElement && ! target.classList.contains('no-router') && ! target.hasAttribute(EVENTS.onClick) && target.href.startsWith(location.origin)) {
 		target.addEventListener('click', _interceptLinkClick, { signal, passive: false });
-	} else if (target.tagName === 'FORM' && ! target.classList.contains('no-router') && ! target.hasAttribute(EVENTS.onSubmit) && target.action.startsWith(location.origin)) {
+	} else if (target instanceof HTMLFormElement && ! target.classList.contains('no-router') && ! target.hasAttribute(EVENTS.onSubmit) && target.action.startsWith(location.origin)) {
 		target.addEventListener('submit', _interceptFormSubmit, { signal, passive: false });
 
 		target.querySelectorAll(`a[href]:not([rel~="external"], .no-router, [${EVENTS.onClick}])`).forEach(el => {
@@ -531,7 +622,7 @@ export function setRoot(target, selector) {
 /**
  * Observes links on an element for navigation.
  *
- * @param {HTMLElement|string} target - The element to observe links on. Defaults to document.body.
+ * @param {HTMLElement|ShadowRoot|string} target - The element to observe links on. Defaults to document.body.
  * @param {object} [options] - Optional options.
  * @param {AbortSignal} [options.signal] - An AbortSignal to cancel the observation.
  */
@@ -540,12 +631,12 @@ export function observeLinksOn(target = document.body, { signal } = {}) {
 		throw signal.reason;
 	} else if (typeof target === 'string') {
 		observeLinksOn(document.querySelector(target), { signal });
-	} else if (target instanceof HTMLElement) {
+	} else if (target instanceof HTMLElement || target instanceof ShadowRoot) {
 		interceptNav(target, { signal });
-		mutObserver.observe(target, { childList: true, subtree: true });
+		navObserver.observe(target, { childList: true, subtree: true });
 
 		if (signal instanceof AbortSignal) {
-			signal.addEventListener('abort', () => mutObserver.disconnect(), { once: true });
+			signal.addEventListener('abort', () => navObserver.disconnect(), { once: true });
 		}
 	} else {
 		throw new TypeError('Cannot observe link on a non-Element. Requires an Element or selector.');
@@ -619,7 +710,7 @@ export async function registerPath(path, moduleSrc, {
 	} else if (! (typeof moduleSrc === 'string' || moduleSrc instanceof Function || moduleSrc instanceof URL)) {
 		throw new TypeError('Module source/handler must be a module specifier/url or handler function.');
 	} else if (path instanceof URLPattern) {
-		registry.set(path, moduleSrc);
+		ROUTES_REGISTRY.set(path, moduleSrc);
 
 		if (preload && (typeof moduleSrc === 'string' || moduleSrc instanceof URL)) {
 			await preloadModule(moduleSrc, { signal, crossOrigin, referrerPolicy });
@@ -637,7 +728,7 @@ export async function registerPath(path, moduleSrc, {
  * Clears all registered paths
  */
 export function clearPaths() {
-	registry.clear();
+	ROUTES_REGISTRY.clear();
 }
 
 /**
@@ -670,7 +761,7 @@ export async function getModule(input = location, {
 		if (! (match instanceof URLPattern)) {
 			return await _getHTML(input, { method, signal: getNavSignal({ signal }), body: formData, state, integrity });
 		} else {
-			const handler = registry.get(match);
+			const handler = ROUTES_REGISTRY.get(match);
 			return await _handleModule(handler, {
 				url: input,
 				matches: match.exec(input),
@@ -720,13 +811,13 @@ export async function navigate(url, newState = getStateObj(), {
 		try {
 			const oldState = getStateObj();
 			const diff = diffState(newState, oldState);
-			const navigate = new NavigationEvent(NAV_EVENT, EVENT_TYPES.navigate, {
+			const navigate = new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.navigate, {
 				detail: { newState, oldState, oldURL: new URL(location.href), newURL: url, method, formData },
 			});
 
 			EVENT_TARGET.dispatchEvent(navigate);
 
-			if (! navigate.defaultPrevented) {
+			if (! await navigate[NAV_CLOSE_SYMBOL]()) {
 				history.pushState(newState, '', url);
 				const content = await getModule(url, { signal, method, formData, state: newState, integrity });
 				await notifyStateChange(diff);
@@ -747,24 +838,28 @@ export async function navigate(url, newState = getStateObj(), {
  * Navigates back in the history.
  */
 export function back() {
-	const event = new NavigationEvent(NAV_EVENT, EVENT_TYPES.back);
+	const event = new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.back);
 	EVENT_TARGET.dispatchEvent(event);
 
-	if (! event.defaultPrevented) {
-		history.back();
-	}
+	event[NAV_CLOSE_SYMBOL]().then(prevented => {
+		if (! prevented) {
+			history.back();
+		}
+	});
 }
 
 /**
  * Navigates forward in the history.
  */
 export function forward() {
-	const event = new NavigationEvent(NAV_EVENT, EVENT_TYPES.forward);
+	const event = new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.forward);
 	EVENT_TARGET.dispatchEvent(event);
 
-	if (! event.defaultPrevented) {
-		history.forward();
-	}
+	event[NAV_CLOSE_SYMBOL]().then(prevented => {
+		if (! prevented) {
+			history.forward();
+		}
+	});
 }
 
 /**
@@ -773,24 +868,28 @@ export function forward() {
  * @param {number} [delta=0] - The number of entries to go back or forward. 0 to reload.
  */
 export function go(delta = 0) {
-	const event = new NavigationEvent(NAV_EVENT, EVENT_TYPES.go);
+	const event = new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.go);
 	EVENT_TARGET.dispatchEvent(event);
 
-	if (! event.defaultPrevented) {
-		history.go(delta);
-	}
+	event[NAV_CLOSE_SYMBOL]().then(prevented => {
+		if (! prevented) {
+			history.go(delta);
+		}
+	});
+
 }
 
 /**
  * Reloads the current page.
  */
 export function reload() {
-	const event = new NavigationEvent(NAV_EVENT, EVENT_TYPES.reload);
+	const event = new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.reload);
 	EVENT_TARGET.dispatchEvent(event);
-
-	if (! event.defaultPrevented) {
-		history.go(0);
-	}
+	event[NAV_CLOSE_SYMBOL]().then(prevented => {
+		if (! prevented) {
+			history.go(0);
+		}
+	});
 }
 
 /**
@@ -864,15 +963,16 @@ export function setDescription(description) {
  * @param {object|string|HTMLScriptElement} routes - An object mapping URL patterns to module source URLs or specifiers, or a script/id to script
  * @param {object} [options] - Optional options.
  * @param {boolean} [options.preload=false] - Whether to preload all modules.
- * @param {HTMLElement|string} [options.inteceptRoot] - The element to intercept link clicks on.
+ * @param {HTMLElement|ShadowRoot|string} [options.inteceptRoot] - The element to intercept link clicks on.
  * @param {string} [options.baseURL] - The base URL for URL patterns.
  * @param {string} [options.notFound] - The 404 handler.
- * @param {HTMLElement|string} [options.rootNode] - The root element for the navigation system.
+ * @param {HTMLElement|ShadowRoot|string} [options.rootNode] - The root element for the navigation system.
  * @param {AbortSignal} [options.signal] - An AbortSignal to cancel the initialization.
  * @returns {Promise<AbortSignal>} - A promise that resolves with an `AbortSignal` that aborts on first navigation.
  */
 export async function init(routes, {
 	preload = false,
+	observePreloads = false,
 	inteceptRoot = document.body,
 	baseURL = location.origin,
 	crossOrigin = 'anonymous',
@@ -885,15 +985,27 @@ export async function init(routes, {
 	signal,
 } = {}) {
 	if (typeof routes === 'string') {
-		await init(document.querySelector(routes), { preload, inteceptRoot, baseURL, notFound, rootEl, signal });
+		await init(document.querySelector(routes), { preload, observePreloads, inteceptRoot, baseURL, notFound, rootEl: root, signal });
 	} else if (routes instanceof HTMLScriptElement && routes.type === 'application/json') {
-		await init(JSON.parse(routes.textContent), { preload, inteceptRoot, baseURL, notFound, rootEl, signal });
+		await init(JSON.parse(routes.textContent), { preload, observePreloads, inteceptRoot, baseURL, notFound, rootEl: root, signal });
 	} else if (typeof routes !== 'object' || routes === null || Object.getPrototypeOf(routes) !== Object.prototype) {
 		throw new TypeError('Routes must be a plain object, a script with JSON, or the selector to such a script.');
+	} else if (typeof inteceptRoot === 'string') {
+		init(routes, { preload, observePreloads, inteceptRoot: document.querySelector(inteceptRoot), baseURL, notFound, rootEl, signal });
+	} else if (typeof root === 'string') {
+		init(routes, { preload, observePreloads, inteceptRoot, baseURL, notFound, rootEl: document.querySelector(root), signal });
+	} else if (! (inteceptRoot instanceof HTMLElement || inteceptRoot instanceof ShadowRoot)) {
+		throw new TypeError('`interceptRoot` must be a selector, HTMLElement, or ShadowRoot.');
+	} else if (! (root instanceof HTMLElement || root instanceof ShadowRoot)) {
+		throw new TypeError('`rootEl` must be a selector, HTMLElement, or ShadowRoot.');
 	} else {
 		const opts = { preload, signal, crossOrigin, referrerPolicy, fetchPriority, as, baseURL };
 
 		const reg = Object.entries(routes).map(([pattern, moduleSrc]) => registerPath(pattern, moduleSrc, opts));
+
+		if (observePreloads) {
+			observePreloadsOn(inteceptRoot);
+		}
 
 		if (typeof notFound === 'string') {
 			set404(notFound);
@@ -903,11 +1015,11 @@ export async function init(routes, {
 			}
 		}
 
-		if (root instanceof HTMLElement || typeof root === 'string') {
+		if (root instanceof HTMLElement || root instanceof ShadowRoot || typeof root === 'string') {
 			setRoot(root);
 		}
 
-		if (inteceptRoot instanceof HTMLElement || typeof inteceptRoot === 'string') {
+		if (inteceptRoot instanceof HTMLElement || inteceptRoot instanceof ShadowRoot || typeof inteceptRoot === 'string') {
 			observeLinksOn(inteceptRoot, { signal });
 		}
 
@@ -1078,7 +1190,7 @@ export async function dnsPrefetch(href) {
  * @param {AbortSignal} [options.signal] - An optional AbortSignal to tie the lifetime of the `AbortController` to.
  * @returns {AbortController} An `AbortController` that is aborted on navigation or when the provided signal is aborted.
  */
-export function getNavController({ signal, passive } = {}) {
+export function getNavController({ signal } = {}) {
 	const controller = new AbortController();
 	const callback = event => {
 		// load & pop events occur after navigation
@@ -1087,7 +1199,7 @@ export function getNavController({ signal, passive } = {}) {
 		}
 	};
 
-	EVENT_TARGET.addEventListener(NAV_EVENT, callback, { signal, passive });
+	EVENT_TARGET.addEventListener(NAV_EVENT, callback, { signal, passive: true });
 
 	return controller;
 }
@@ -1102,8 +1214,8 @@ export function getNavController({ signal, passive } = {}) {
  * @param {AbortSignal} [options.signal] - An optional AbortSignal to tie the lifetime of the returned signal to.
  * @returns {AbortSignal} An AbortSignal that is aborted on navigation or when the provided signal is aborted.
  */
-export function getNavSignal({ signal, passive } = {}) {
-	const controller = getNavController({ signal, passive });
+export function getNavSignal({ signal } = {}) {
+	const controller = getNavController({ signal });
 
 	return signal instanceof AbortSignal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
 }
@@ -1117,7 +1229,7 @@ export function getNavSignal({ signal, passive } = {}) {
  * @param {AbortSignal} [options.signal] - An optional AbortSignal to tie the lifetime of the operation to.
  * @returns {Promise<URL>} A Promise that resolves to the URL of the new page or rejects with an AbortError.
  */
-export async function whenNavigated({ signal, passive } = {}) {
+export async function whenNavigated({ signal } = {}) {
 	const { resolve, reject, promise } = Promise.withResolvers();
 
 	if (signal instanceof AbortSignal && signal.aborted) {
@@ -1125,7 +1237,7 @@ export async function whenNavigated({ signal, passive } = {}) {
 	} else {
 
 		if (signal instanceof AbortSignal) {
-			const navSignal = getNavSignal({ signal, passive });
+			const navSignal = getNavSignal({ signal });
 			const controller = new AbortController();
 			navSignal.addEventListener('abort', () => resolve(new URL(location.href)), { once: true, signal: AbortSignal.any([signal, controller.signal ]) });
 			signal.addEventListener('abort', ({ target }) => reject(target.reason), { once: true });
@@ -1136,7 +1248,7 @@ export async function whenNavigated({ signal, passive } = {}) {
 				}
 			});
 		} else {
-			const navSignal = getNavSignal({ passive });
+			const navSignal = getNavSignal({ signal });
 			navSignal.addEventListener('abort', () => resolve(new URL(location.href)), { once: true });
 			return promise;
 		}
@@ -1179,7 +1291,7 @@ export async function preloadOnHover(target, {
 			const pattern = findPath(target.href);
 
 			if (pattern instanceof URLPattern) {
-				await preloadModule(registry.get(pattern), {
+				await preloadModule(ROUTES_REGISTRY.get(pattern), {
 					fetchPriority,
 					referrerPolicy,
 					crossOrigin,
@@ -1207,4 +1319,38 @@ export async function preloadOnHover(target, {
 	}
 
 	await promise;
+}
+
+/**
+ * Adds `mouseenter` listeners to preload links/handlers via a `MutationObserver`
+ *
+ * @param {HTMLElement|ShadowRoot|string} target Target for the mutation observer or its selector
+ * @param {HTMLElement|ShadowRoot} [base=document] The element to query from if `target` is a selector
+ */
+export function observePreloadsOn(target, base = document) {
+	if (typeof target === 'string') {
+		observePreloadsOn(base.querySelector(target));
+	} else if (target instanceof HTMLElement || target instanceof ShadowRoot) {
+		preloadObserver.observe(target, { childList : true, subtree: true });
+		_handlePreloadMutations(target);
+	} else {
+		throw new TypeError('`observePreloadsOn` requires a selector or HTMLElement or ShadowRoot.');
+	}
+}
+
+/**
+ * Combines `observeLinksOn` and `observePreloadsOn`
+ *
+ * @param {HTMLElement|ShadowRoot|string} target Target for the mutation observers or its selector
+ * @param {HTMLElement|ShadowRoot} [base=document] The element to query from if `target` is a selector
+ */
+export function observe(target, base = document) {
+	if (typeof target === 'string') {
+		observe(base.querySelector(target));
+	} else if (target instanceof HTMLElement || target instanceof ShadowRoot) {
+		observeLinksOn(target);
+		observePreloadsOn(target);
+	}else {
+		throw new TypeError('`observe` requires a selector or HTMLElement or ShadowRoot.');
+	}
 }

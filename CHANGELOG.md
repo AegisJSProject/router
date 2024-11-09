@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.0.7] - 2024-11-09
+
+### Added
+- Add `waitUntil()` method on navigation events
+- Add an `AbortSignal` to navigation events (indicator of `preventDefault()` being called)
+- Add support for working on `ShadowRoot`s
+- Add `MutationObserver` to preload links/routes on hover
+
+### Changed
+- Rename `NagivationEvent` -> `AegisNavigationEvent`
+
 ## [v1.0.6] - 2024-11-07
 
 ### Added
