@@ -1,4 +1,4 @@
-import { init, back, forward, reload, registerPath, url, preloadOnHover } from '@aegisjsproject/router/router.js';
+import { init, back, forward, reload, registerPath, url, observePreloadsOn } from '@aegisjsproject/router/router.js';
 import { observeEvents } from '@aegisjsproject/core/events.js';
 import { reset } from '@aegisjsproject/styles/reset.js';
 import { baseTheme, lightTheme, darkTheme } from '@aegisjsproject/styles/theme.js';
@@ -36,16 +36,39 @@ init('#routes', {
 	signal: controller.signal,
 }).finally(() => console.timeEnd('init'));
 
-preloadOnHover('#nav a');
+observePreloadsOn('#nav');
 
 registerPath('/product/?id=:productId', ({ matches }) => url`${location.origin}/product/${matches.search.groups.productId}`);
 
-// document.querySelectorAll('[data-link]').forEach(el => {
-// 	el.addEventListener('click', ({ currentTarget }) => {
-// 		const { link, ...state } = currentTarget.dataset;
-// 		navigate(link, state);
-// 	}, { signal: controller.signal });
-// });
+document.addEventListener('aegis:navigate', event => {
+	event.waitUntil(async () => {
+		const root = document.getElementById('root');
+		const opts = { duration: 200, fill: 'both', easing: 'ease-out' };
+
+		await Promise.all(root.getAnimations().map(anim => anim.finished));
+
+		switch(event.reason) {
+			case 'aegis:router:back':
+			case 'aegis:router:forward':
+			case 'aegis:router:navigate':
+			case 'aegis:router:go':
+				await root.animate([
+					{ opacity: 1 },
+					{ opacity: 0 },
+				], opts).finished;
+				break;
+
+			case 'aegis:router:load':
+				await root.animate([
+					{ opacity: 0 },
+					{ opacity: 1 },
+				], opts).finished;
+				break;
+		}
+	});
+}, {
+	passive: true,
+});
 
 document.querySelectorAll('[data-nav]').forEach(el => {
 	el.addEventListener('click', ({ currentTarget }) => {

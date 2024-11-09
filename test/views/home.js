@@ -1,50 +1,51 @@
-import { btn, btnOutlineDanger } from '@aegisjsproject/styles/button.js';
+import { btn, btnOutlineDanger, btnOutlineInfo } from '@aegisjsproject/styles/button.js';
+import { positions } from '@aegisjsproject/styles/misc.js';
 
-export default ({ signal }) => {
-	const dialog = document.createElement('dialog');
-	const container = document.createElement('div');
-	const shadow = container.attachShadow({ mode: 'open' });
-	const close = document.createElement('button');
-	const p = document.createElement('p');
-	const watcher = new CloseWatcher();
+const styles = await new CSSStyleSheet().replace(`:popover-open {
+	display: block;
+	max-height: 90dvh;
+	max-width: 90vw;
+	min-width: 60vw;
+	overflow: auto;
+	border-radius: 6px;
+	border-style: none;
+	font-family: system-ui;
+}
 
-	p.textContent = 'Hello, World!';
-	close.type = 'button';
-	close.textContent = 'X';
-	close.title = 'Close';
-	close.accessKey = 'x';
-	close.classList.add('btn', 'btn-outline-danger');
+:popover-open::backdrop {
+	background-color: rgba(0, 0, 0, 0.6);
+	backdrop-filter: blur(4px);
+}
 
-	dialog.addEventListener('close', ({ target }) => target.remove(), { once: true, signal });
-	close.addEventListener('click', watcher.requestClose.bind(watcher), { signal });
-	watcher.addEventListener('close', () => dialog.close(), { once: true, signal });
+.header {
+	background-color: rgba(0, 0, 0, 0.6);
+	backdrop-filter: blur(5px);
+	padding: 0.3em;
+}`);
+
+export default ({ url, state, timestamp, matches, signal }) => {
+	const el = document.createElement('div');
+
+	el.setHTMLUnsafe(`<div>
+		<template shadowrootmode="open" shadowrootserializable="">
+			<div part="popover" popover="manual" id="popover">
+				<div part="header" class="header sticky top z-4">
+					<button type="button" class="btn btn-outline-danger" popovertarget="popover" popovertargetaction="hide">Close</button>
+				</div>
+				<pre part="content"><slot name="content">No Content</slot></pre>
+			</div>
+			<button type="button" popovertarget="popover" popovertargetaction="show" class="btn btn-outline-info">Show Popover</button>
+		</template>
+		<code slot="content">${JSON.stringify({ url, state, timestamp, matches, signal: { aborted: signal.aborted }}, null, 4)}</code>
+	</div>`);
+
 	signal.addEventListener('abort', () => {
-		if (dialog.isConnected) {
-			dialog.close();
-			dialog.remove();
+		if (el.firstElementChild.isConnected) {
+			el.firstElementChild.shadowRoot.getElementById('popover').hidePopover();
 		}
 	}, { once: true });
 
-	const anim = dialog.animate([
-		{ opacity: 0, transform: 'scale(0)' },
-		{ opacity: 1, transform: 'none' },
-	], {
-		duration: 400,
-		easing: 'ease-out',
-	});
+	el.firstElementChild.shadowRoot.adoptedStyleSheets = [btn, btnOutlineDanger, btnOutlineInfo, positions, styles];
 
-	anim.pause();
-
-	setTimeout(() => {
-		if (dialog.isConnected) {
-			anim.play();
-			dialog.showModal();
-		}
-	}, 50);
-
-	shadow.append(close, p);
-	shadow.adoptedStyleSheets = [btn, btnOutlineDanger];
-	dialog.append(container);
-
-	return dialog;
+	return el.firstElementChild;
 };

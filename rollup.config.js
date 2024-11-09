@@ -4,7 +4,7 @@ import terser from '@rollup/plugin-terser';
 export default [{
 	input: 'router.js',
 	plugins: [nodeResolve()],
-	external: ['@aegisjsproject/state'],
+	external: ['@aegisjsproject/state', '@aegisjsprojec/state/state.js'],
 	output: [{
 		file: 'router.cjs',
 		format: 'cjs',
