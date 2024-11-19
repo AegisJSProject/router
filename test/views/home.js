@@ -49,3 +49,6 @@ export default ({ url, state, timestamp, matches, signal }) => {
 
 	return el.firstElementChild;
 };
+
+export const title = 'AegisJSProject Home';
+export const description = 'Testing AegisJSProject Router library';

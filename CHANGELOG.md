@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.0] - 2024-11-19
+
+### Added
+- Add support for scrolling to top of page or anchor elements on navigation
+- Add support for animations on navigation
+- Add support for setting page title & description via exported `title`s and `description`s
+- Add `timeNavigation()` function to time duration of navigation
+
+### Changed
+- Make `back()`, `forward()` and `go()` async and wait for actual navigation
+- Extend navigation controllers/promises to work on only specified `event.reason`s
+
+### Fixed
+- Removed old JSDoc references to `RegEx` support
+
 ## [v1.0.7] - 2024-11-09
 
 ### Added

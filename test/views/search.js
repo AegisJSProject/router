@@ -27,3 +27,6 @@ export default (params) => {
 		<pre><code>${JSON.stringify(params, null, 4)}</code></pre>
 	`;
 };
+
+export const title = () => `Search results for "${query}"`;
+export const description = () => `Search results for "${query}"`;

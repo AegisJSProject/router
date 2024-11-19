@@ -12,6 +12,7 @@ const preloadObserver = new MutationObserver(entries => entries.forEach(_handleP
 const ROOT_ID = 'root';
 const EVENT_TARGET = document;
 const NAV_CLOSE_SYMBOL = Symbol.for('aegis:navigate:event:close');
+const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 let rootEl = document.getElementById(ROOT_ID) ?? document.body;
 let rootSelector = '#' + ROOT_ID;
 
@@ -37,6 +38,8 @@ export const EVENT_TYPES = {
 	load: 'aegis:router:load',
 	submit: 'aegis:router:submit',
 };
+
+const DEFAULT_REASONS = [EVENT_TYPES.back, EVENT_TYPES.forward, EVENT_TYPES.navigate, EVENT_TYPES.submit, EVENT_TYPES.reload, EVENT_TYPES.go];
 
 export class AegisNavigationEvent extends CustomEvent {
 	#reason;
@@ -98,7 +101,7 @@ export class AegisNavigationEvent extends CustomEvent {
 		this.#controller.abort(reason);
 	}
 
-	waitUntil(promiseOrCallback, { signal = AbortSignal.timeout(500) } = {}) {
+	waitUntil(promiseOrCallback, { signal } = {}) {
 		const { promise, resolve, reject } = Promise.withResolvers();
 
 		this.#promises.push(promise);
@@ -154,8 +157,6 @@ const policy = 'trustedTypes' in globalThis
 
 async function _popstateHandler(event) {
 	const diff = diffState(event.state ?? {});
-	await notifyStateChange(diff);
-	const content = await getModule(new URL(location.href));
 	const navigate = new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.pop, {
 		detail: { newState: event.state, oldState: null, oldURL: new URL(location.href), method: 'GET', formData: null },
 	});
@@ -163,7 +164,15 @@ async function _popstateHandler(event) {
 	EVENT_TARGET.dispatchEvent(navigate);
 
 	if (! await navigate[NAV_CLOSE_SYMBOL]()) {
+		const old = history.scrollRestoration;
+		const [content] = await Promise.all([
+			getModule(new URL(location.href)),
+			notifyStateChange(diff),
+		]);
+
+		history.scrollRestoration = 'auto';
 		_updatePage(content);
+		history.scrollRestoration = old;
 	}
 };
 
@@ -384,9 +393,32 @@ function _updatePage(content) {
 	}
 
 	EVENT_TARGET.dispatchEvent(new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.load, { cancelable: false }));
+
+	if (history.scrollRestoration === 'manual') {
+		if (location.hash.length > 1) {
+			const target = document.getElementById(location.hash.substring(1)) ?? document.body;
+			target.scrollIntoView({ behavior: prefersReducedMotion.matches ? 'instant' : 'smooth' });
+		} else {
+			document.body.scrollIntoView({ behavior: prefersReducedMotion.matches ? 'instant' : 'smooth' });
+		}
+	}
 }
 
-async function _handleModule(moduleSrc, { state = getStateObj(), ...args } = {}) {
+async function _handleMetadata({ title, description } = {}, { state, matches, url, signal } = {}) {
+	if (typeof title === 'string') {
+		setTitle(title);
+	} else if (typeof title === 'function') {
+		setTitle(await title({ state, matches, url, signal }));
+	}
+
+	if (typeof description === 'string') {
+		setDescription(description);
+	} else if (typeof description === 'function') {
+		setDescription(await description({ state, matches, url, signal }));
+	}
+}
+
+async function _handleModule(moduleSrc, { state = getStateObj(), matches = {}, signal, ...args } = {}) {
 	const module = await Promise.try(() => {
 		if (moduleSrc instanceof Function) {
 			return moduleSrc(args);
@@ -416,22 +448,28 @@ async function _handleModule(moduleSrc, { state = getStateObj(), ...args } = {})
 			);
 		}
 
+		_handleMetadata(module, { state, matches, url, signal });
+
 		return new module.default({
 			url,
+			matches,
 			state,
 			timestamp,
-			signal: getNavSignal(),
+			signal: getNavSignal({ signal }),
 			...args
 		});
 	} else if (module.default instanceof Function) {
+		_handleMetadata(module, { state, matches, url, signal });
 		return await module.default({
 			url,
+			matches,
 			state,
 			timestamp,
-			signal: getNavSignal(),
+			signal: getNavSignal({ signal }),
 			...args
 		});
 	} else if (module.default instanceof Node || module.default instanceof Error) {
+		_handleMetadata(module, { state, matches, url, signal });
 		_updatePage(module.default);
 	} else {
 		throw new TypeError(`${moduleSrc} has a missing or invalid default export.`);
@@ -648,7 +686,7 @@ export function observeLinksOn(target = document.body, { signal } = {}) {
  *
  * @param {string|URL|URLPattern} path - The path to create the pattern from.
  * @param {string} [baseURL=location.origin] - The base URL to use for relative paths. Defaults to the current origin.
- * @returns {URLPattern|RegExp|null} - The created URLPattern object, or `null` if the input is invalid.
+ * @returns {URLPattern|null} - The created URLPattern object, or `null` if the input is invalid.
  */
 export function getURLPattern(path, baseURL = location.origin) {
 	if (path instanceof URLPattern) {
@@ -792,6 +830,7 @@ export async function navigate(url, newState = getStateObj(), {
 	method = 'GET',
 	formData,
 	integrity,
+	scrollRestoration = null,
 } = {}) {
 	if (url === null) {
 		throw new TypeError('URL cannot be null.');
@@ -818,6 +857,10 @@ export async function navigate(url, newState = getStateObj(), {
 			EVENT_TARGET.dispatchEvent(navigate);
 
 			if (! await navigate[NAV_CLOSE_SYMBOL]()) {
+				if (typeof scrollRestoration === 'string') {
+					history.scrollRestoration = scrollRestoration;
+				}
+
 				history.pushState(newState, '', url);
 				const content = await getModule(url, { signal, method, formData, state: newState, integrity });
 				await notifyStateChange(diff);
@@ -837,13 +880,14 @@ export async function navigate(url, newState = getStateObj(), {
 /**
  * Navigates back in the history.
  */
-export function back() {
+export async function back({ signal } = {}) {
 	const event = new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.back);
 	EVENT_TARGET.dispatchEvent(event);
 
-	event[NAV_CLOSE_SYMBOL]().then(prevented => {
+	await event[NAV_CLOSE_SYMBOL]().then(async prevented => {
 		if (! prevented) {
 			history.back();
+			await whenNavigated({ signal, reasons: [EVENT_TYPES.load] });
 		}
 	});
 }
@@ -851,13 +895,14 @@ export function back() {
 /**
  * Navigates forward in the history.
  */
-export function forward() {
+export async function forward({ signal } = {}) {
 	const event = new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.forward);
 	EVENT_TARGET.dispatchEvent(event);
 
-	event[NAV_CLOSE_SYMBOL]().then(prevented => {
+	await event[NAV_CLOSE_SYMBOL]().then(async prevented => {
 		if (! prevented) {
 			history.forward();
+			await whenNavigated({ signal, reasons: [EVENT_TYPES.load] });
 		}
 	});
 }
@@ -867,16 +912,16 @@ export function forward() {
  *
  * @param {number} [delta=0] - The number of entries to go back or forward. 0 to reload.
  */
-export function go(delta = 0) {
+export async function go(delta = 0, { signal } = {}) {
 	const event = new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.go);
 	EVENT_TARGET.dispatchEvent(event);
 
-	event[NAV_CLOSE_SYMBOL]().then(prevented => {
+	await event[NAV_CLOSE_SYMBOL]().then(async prevented => {
 		if (! prevented) {
 			history.go(delta);
+			await whenNavigated({ signal, reasons: [EVENT_TYPES.load] });
 		}
 	});
-
 }
 
 /**
@@ -885,6 +930,7 @@ export function go(delta = 0) {
 export function reload() {
 	const event = new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.reload);
 	EVENT_TARGET.dispatchEvent(event);
+
 	event[NAV_CLOSE_SYMBOL]().then(prevented => {
 		if (! prevented) {
 			history.go(0);
@@ -958,15 +1004,19 @@ export function setDescription(description) {
 }
 
 /**
- * Initializes the navigation system.
+ * Initializes the navigation system/router.
  *
  * @param {object|string|HTMLScriptElement} routes - An object mapping URL patterns to module source URLs or specifiers, or a script/id to script
  * @param {object} [options] - Optional options.
  * @param {boolean} [options.preload=false] - Whether to preload all modules.
+ * @param {boolean} [options.observePreloads=false] - If true, modules will be preloaded on link hover
  * @param {HTMLElement|ShadowRoot|string} [options.inteceptRoot] - The element to intercept link clicks on.
  * @param {string} [options.baseURL] - The base URL for URL patterns.
  * @param {string} [options.notFound] - The 404 handler.
  * @param {HTMLElement|ShadowRoot|string} [options.rootNode] - The root element for the navigation system.
+ * @param {object} [options.transition] - Config for optional animations on navigation events
+ * @param {Keyframe} [options.transition.keyframes] - Keyframes for an animation during transitions/navigation
+ * @param {KeyframeAnimationOptions} [options.transition.options] - Options such as duration and easing for navigation animations
  * @param {AbortSignal} [options.signal] - An AbortSignal to cancel the initialization.
  * @returns {Promise<AbortSignal>} - A promise that resolves with an `AbortSignal` that aborts on first navigation.
  */
@@ -979,21 +1029,44 @@ export async function init(routes, {
 	referrerPolicy = 'no-referrer',
 	fetchPriority = 'low',
 	as = 'script',
-	scrollRestoration = 'auto',
+	scrollRestoration = 'manual',
 	notFound,
 	rootEl: root,
+	transition: {
+		keyframes,
+		options: {
+			duration = 150,
+			easing = 'ease-out',
+			delay = 0,
+			composite = 'replace',
+			fill = 'both',
+		} = {}
+	} = {},
 	signal,
 } = {}) {
 	if (typeof routes === 'string') {
-		await init(document.querySelector(routes), { preload, observePreloads, inteceptRoot, baseURL, notFound, rootEl: root, signal });
+		await init(document.querySelector(routes), {
+			preload, observePreloads, inteceptRoot, baseURL, notFound, rootEl: root,
+			transition: { keyframes, options: { duration, easing, delay, composite, fill }},
+			signal,
+		},
+		);
 	} else if (routes instanceof HTMLScriptElement && routes.type === 'application/json') {
-		await init(JSON.parse(routes.textContent), { preload, observePreloads, inteceptRoot, baseURL, notFound, rootEl: root, signal });
+		await init(JSON.parse(routes.textContent), {
+			preload, observePreloads, inteceptRoot, baseURL, notFound, rootEl: root,
+			transition: { keyframes, options: { duration, easing, delay, composite, fill }},
+			signal,
+		});
 	} else if (typeof routes !== 'object' || routes === null || Object.getPrototypeOf(routes) !== Object.prototype) {
 		throw new TypeError('Routes must be a plain object, a script with JSON, or the selector to such a script.');
 	} else if (typeof inteceptRoot === 'string') {
 		init(routes, { preload, observePreloads, inteceptRoot: document.querySelector(inteceptRoot), baseURL, notFound, rootEl, signal });
 	} else if (typeof root === 'string') {
-		init(routes, { preload, observePreloads, inteceptRoot, baseURL, notFound, rootEl: document.querySelector(root), signal });
+		init(routes, {
+			preload, observePreloads, inteceptRoot, baseURL, notFound, rootEl: document.querySelector(root),
+			transition: { keyframes, options: { duration, easing, delay, composite, fill }},
+			signal,
+		});
 	} else if (! (inteceptRoot instanceof HTMLElement || inteceptRoot instanceof ShadowRoot)) {
 		throw new TypeError('`interceptRoot` must be a selector, HTMLElement, or ShadowRoot.');
 	} else if (! (root instanceof HTMLElement || root instanceof ShadowRoot)) {
@@ -1027,6 +1100,18 @@ export async function init(routes, {
 		setScrollRestoration(scrollRestoration);
 		_updatePage(content);
 		addPopstateListener({ signal });
+
+		if (typeof keyframes === 'object' && keyframes !== null) {
+			const navEvents = [EVENT_TYPES.navigate, EVENT_TYPES.go, EVENT_TYPES.back, EVENT_TYPES.forward];
+
+			EVENT_TARGET.addEventListener(NAV_EVENT, event => {
+				if (! event.defaultPrevented && navEvents.includes(event.reason)) {
+					event.waitUntil(() => rootEl.animate(keyframes, { duration, easing, fill, delay, composite, direction: 'normal' }).finished, { signal });
+				} else if (event.reason === EVENT_TYPES.load) {
+					event.waitUntil(() => rootEl.animate(keyframes, { duration, easing, fill, delay, composite, direction: 'reverse' }).finished, { signal });
+				}
+			}, { signal });
+		}
 
 		await Promise.allSettled(reg).then(results => {
 			const errs = results.filter(result => result.status === 'rejected');
@@ -1188,20 +1273,33 @@ export async function dnsPrefetch(href) {
  *
  * @param {object} options - Optional options object.
  * @param {AbortSignal} [options.signal] - An optional AbortSignal to tie the lifetime of the `AbortController` to.
+ * @param {string|string[]} [options.reasons] - An array of event type/reasons to abort on.
  * @returns {AbortController} An `AbortController` that is aborted on navigation or when the provided signal is aborted.
  */
-export function getNavController({ signal } = {}) {
-	const controller = new AbortController();
-	const callback = event => {
-		// load & pop events occur after navigation
-		if (! event.defaultPrevented && event.reason !== EVENT_TYPES.load && event.reason !== EVENT_TYPES.pop) {
-			controller.abort(`Navigated away from ${location.href}.`);
+export function getNavController({ signal, reasons = DEFAULT_REASONS } = {}) {
+	if (typeof reasons === 'string') {
+		return getNavController({ signal, reasons: [reasons] });
+	} else if (! Array.isArray(reasons) || reasons.length === 0) {
+		throw new TypeError('`reasosn` must be an array of reasons for the naviation event.');
+	} else if (signal instanceof AbortSignal && signal.aborted) {
+		throw signal.reason;
+	} else {
+		const controller = new AbortController();
+
+		if (signal instanceof AbortSignal) {
+			signal.addEventListener('abort', ({ target }) => {
+				controller.abort(target.reason);
+			}, { once: true, signal: controller.signal });
 		}
-	};
 
-	EVENT_TARGET.addEventListener(NAV_EVENT, callback, { signal, passive: true });
+		EVENT_TARGET.addEventListener(NAV_EVENT, event => {
+			if (reasons.includes(event.reason)) {
+				controller.abort(`Navigated away from ${location.href}.`);
+			}
+		}, { passive: true, signal: controller.signal });
 
-	return controller;
+		return controller;
+	}
 }
 
 /**
@@ -1212,12 +1310,13 @@ export function getNavController({ signal } = {}) {
  *
  * @param {object} options - Optional options object.
  * @param {AbortSignal} [options.signal] - An optional AbortSignal to tie the lifetime of the returned signal to.
+ * @param {string|string[]} [options.reasons] - An array of event type/reasons to abort on.
  * @returns {AbortSignal} An AbortSignal that is aborted on navigation or when the provided signal is aborted.
  */
-export function getNavSignal({ signal } = {}) {
-	const controller = getNavController({ signal });
+export function getNavSignal({ signal, reasons = DEFAULT_REASONS } = {}) {
+	const controller = getNavController({ signal, reasons });
 
-	return signal instanceof AbortSignal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
+	return controller.signal;
 }
 
 /**
@@ -1227,32 +1326,37 @@ export function getNavSignal({ signal } = {}) {
  *
  * @param {object} options - Optional options object.
  * @param {AbortSignal} [options.signal] - An optional AbortSignal to tie the lifetime of the operation to.
+ * @param {string[]} [options.reasons] - An array of event type/reasons to abort on.
  * @returns {Promise<URL>} A Promise that resolves to the URL of the new page or rejects with an AbortError.
  */
-export async function whenNavigated({ signal } = {}) {
+export async function whenNavigated({ signal, reasons = DEFAULT_REASONS } = {}) {
 	const { resolve, reject, promise } = Promise.withResolvers();
 
-	if (signal instanceof AbortSignal && signal.aborted) {
+	if (typeof reasons === 'string') {
+		return whenNavigated({ signal, reasons: [reasons] });
+	} else if (signal instanceof AbortSignal && signal.aborted) {
 		reject(signal.reason);
+	} else if (! Array.isArray(reasons) || reasons.length === 0) {
+		reject(new TypeError('`reasosn` must be an array of reasons for the naviation event.'));
 	} else {
+		const controller = new AbortController();
+
+		document.addEventListener(NAV_EVENT, event => {
+			if (reasons.includes(event.reason)) {
+				resolve(new URL(location.href));
+				controller.abort();
+			}
+		}, { signal: controller.signal });
 
 		if (signal instanceof AbortSignal) {
-			const navSignal = getNavSignal({ signal });
-			const controller = new AbortController();
-			navSignal.addEventListener('abort', () => resolve(new URL(location.href)), { once: true, signal: AbortSignal.any([signal, controller.signal ]) });
-			signal.addEventListener('abort', ({ target }) => reject(target.reason), { once: true });
-
-			return promise.finally(() => {
-				if (! controller.signal.aborted) {
-					controller.abort();
-				}
-			});
-		} else {
-			const navSignal = getNavSignal({ signal });
-			navSignal.addEventListener('abort', () => resolve(new URL(location.href)), { once: true });
-			return promise;
+			signal.addEventListener('abort', ({ target }) => {
+				reject(target.reason);
+				controller.abort(target.reason);
+			}, { once: true, signal: controller.signal });
 		}
 	}
+
+	return promise;
 }
 
 /**
@@ -1353,4 +1457,45 @@ export function observe(target, base = document) {
 	}else {
 		throw new TypeError('`observe` requires a selector or HTMLElement or ShadowRoot.');
 	}
+}
+
+/**
+ * Measures navigation time between initial nav event and load event
+ *
+ * @param {object} options
+ * @param {AbortSignal} [options.signal] Optional signal to cancel and reject
+ * @returns {number} Total duration between nav start and load in ms
+ */
+export async function timeNavigation({ signal } = {}) {
+	const { resolve, promise, reject } = Promise.withResolvers();
+	const navController = new AbortController();
+	const loadController = new AbortController();
+
+	if (signal instanceof AbortSignal) {
+		if (signal.aborted) {
+			reject(signal.reason);
+		} else {
+			signal.addEventListener('abort', ({ target }) => {
+				reject(target.reason);
+				navController.abort(target.reason);
+				loadController.abort(target.reason);
+			}, { signal: loadController.signal });
+		}
+	}
+
+	EVENT_TARGET.addEventListener(NAV_EVENT, event => {
+		if ([EVENT_TYPES.navigate, EVENT_TYPES.back, EVENT_TYPES.forward, EVENT_TYPES.go].includes(event.reason)) {
+			navController.abort();
+			const start = performance.now();
+
+			EVENT_TARGET.addEventListener(NAV_EVENT, event => {
+				if (event.reason === EVENT_TYPES.load) {
+					resolve(performance.now() - start);
+					loadController.abort();
+				}
+			}, { signal: loadController.signal });
+		}
+	}, { signal: navController.signal });
+
+	return promise;
 }
