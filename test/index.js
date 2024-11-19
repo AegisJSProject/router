@@ -33,42 +33,22 @@ init('#routes', {
 	notFound: '/test/views/404.js',
 	rootEl: '#root',
 	inteceptRoot: document.body,
+	transition: {
+		keyframes: {
+			opacity: [1, 0],
+			transform: ['none', 'scale(0.8) translateX(-100%)']
+		},
+		options: {
+			easing: 'ease-in',
+			duration: 150,
+		}
+	},
 	signal: controller.signal,
 }).finally(() => console.timeEnd('init'));
 
 observePreloadsOn('#nav');
 
 registerPath('/product/?id=:productId', ({ matches }) => url`${location.origin}/product/${matches.search.groups.productId}`);
-
-document.addEventListener('aegis:navigate', event => {
-	event.waitUntil(async () => {
-		const root = document.getElementById('root');
-		const opts = { duration: 200, fill: 'both', easing: 'ease-out' };
-
-		await Promise.all(root.getAnimations().map(anim => anim.finished));
-
-		switch(event.reason) {
-			case 'aegis:router:back':
-			case 'aegis:router:forward':
-			case 'aegis:router:navigate':
-			case 'aegis:router:go':
-				await root.animate([
-					{ opacity: 1 },
-					{ opacity: 0 },
-				], opts).finished;
-				break;
-
-			case 'aegis:router:load':
-				await root.animate([
-					{ opacity: 0 },
-					{ opacity: 1 },
-				], opts).finished;
-				break;
-		}
-	});
-}, {
-	passive: true,
-});
 
 document.querySelectorAll('[data-nav]').forEach(el => {
 	el.addEventListener('click', ({ currentTarget }) => {

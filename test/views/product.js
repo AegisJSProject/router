@@ -39,3 +39,6 @@ class ProductView extends HTMLElement {
 customElements.define('product-view', ProductView);
 
 export default ProductView;
+
+export const title = () => `Product page for ${product}`;
+export const description = () => `Product page for ${product}`;

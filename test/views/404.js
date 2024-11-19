@@ -8,3 +8,6 @@ export default ({ url, method }) => {
 	div.append(h1, a);
 	return div;
 }
+
+export const title = () => `404 <${location.href}> Not Found`;
+export const description = () => `404 <${location.href}> Not Found`;

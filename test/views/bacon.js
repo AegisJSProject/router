@@ -1,9 +1,7 @@
-// import { html } from '@aegisjsproject/core/parsers/html.js';
 import { manageState } from '@aegisjsproject/state';
-import { preconnect, getURLPath } from '@aegisjsproject/router/router.js';
+import { preconnect } from '@aegisjsproject/router/router.js';
 
 const [ipsum, setIpsum] = manageState('bacon:ipsum', []);
-const numLines = getURLPath('/page/bacon/:lines(\\d+)', 'lines', { fallbackValue: 5 });
 
 preconnect('https://baconipsum.com');
 
@@ -31,7 +29,9 @@ export default class BaconIpsum extends HTMLElement {
 	}
 
 	async connectedCallback() {
-		if (ipsum.length === 0) {
+		const len = ipsum.length;
+
+		if (len === 0 || len !== this.#lines) {
 			const url = new URL('https://baconipsum.com/api/');
 			url.searchParams.set('paras', this.#lines);
 			url.searchParams.set('format', 'json');
@@ -58,15 +58,5 @@ export default class BaconIpsum extends HTMLElement {
 
 customElements.define('bacon-ipusm', BaconIpsum);
 
-// export default async ({ url: { matches} }) => {
-// 	const url = new URL('https://baconipsum.com/api/');
-// 	url.searchParams.set('paras', matches?.pathname?.groups?.lines ?? 5);
-// 	url.searchParams.set('format', 'json');
-// 	url.searchParams.set('start-with-lorem', 1);
-// 	url.searchParams.set('type', 'all-meat');
-
-// 	const resp = await fetch(url, { referrerPolicy: 'no-referrer' });
-// 	const lines = await resp.json();
-
-// 	return html`${lines.map(line => `<p>${line}</p>`).join('\n')}`;
-// }
+export const title = ({ matches }) => `Bacon Ipsum (${ matches?.pathname?.groups?.lines ?? 5} lines)`;
+export const description = 'Like Lorem Ipsum, but more meat!';
