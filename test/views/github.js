@@ -1,6 +1,5 @@
 import { manageState } from '@aegisjsproject/state';
 import { preconnect } from '@aegisjsproject/router/router.js';
-import { url } from '@aegisjsproject/url/url.js';
 
 const [users, setUsers] = manageState('github:users', {});
 
@@ -13,7 +12,7 @@ export default async ({ matches, signal }) => {
 	if (typeof username !== 'string') {
 		return `<p>Error: No GitHub username provided.</p>`;
 	} else if (! (username in users)) {
-		const apiUrl = url`https://api.github.com/users/${username}`;
+		const apiUrl = URL.parse(`https://api.github.com/users/${username}`);
 		const resp = await fetch(apiUrl, { referrerPolicy: 'no-referrer' });
 
 		if (!resp.ok) {

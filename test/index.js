@@ -1,4 +1,4 @@
-import { init, back, forward, reload, registerPath, url, observePreloadsOn } from '@aegisjsproject/router/router.js';
+import { init, back, forward, reload, registerPath, observePreloadsOn } from '@aegisjsproject/router/router.js';
 import { observeEvents } from '@aegisjsproject/core/events.js';
 import { reset } from '@aegisjsproject/styles/reset.js';
 import { baseTheme, lightTheme, darkTheme } from '@aegisjsproject/styles/theme.js';
@@ -48,7 +48,7 @@ init('#routes', {
 
 observePreloadsOn('#nav');
 
-registerPath('/product/?id=:productId', ({ matches }) => url`${location.origin}/product/${matches.search.groups.productId}`);
+registerPath('/product/?id=:productId', ({ matches }) => URL.parse(`${location.origin}/product/${matches.search.groups.productId}`));
 
 document.querySelectorAll('[data-nav]').forEach(el => {
 	el.addEventListener('click', ({ currentTarget }) => {
