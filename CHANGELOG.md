@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.1] - 2024-11-25
+
+### Removed
+- Remove `url` tagged template and `SearchParam`, as are now in `@aegisjsproject/url`
+
 ## [v1.1.0] - 2024-11-19
 
 ### Added
