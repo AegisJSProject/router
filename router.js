@@ -1,6 +1,6 @@
 import { getStateObj, diffState, notifyStateChange } from '@aegisjsproject/state';
 export { url } from '@aegisjsproject/url/url.js';
-import { EVENTS } from '@aegisjsproject/core/events.js';
+import { onClick, onSubmit } from '@aegisjsproject/core/events.js';
 
 const isModule = ! (document.currentScript instanceof HTMLScriptElement);
 const SUPPORTS_IMPORTMAP = HTMLScriptElement.supports('importmap');
@@ -19,10 +19,10 @@ let rootSelector = '#' + ROOT_ID;
 function _handlePreloadMutations(target) {
 	if (target instanceof MutationRecord) {
 		_handlePreloadMutations(target.target);
-	} else if (target.tagName === 'A' && ! target.classList.contains('no-router') && ! target.hasAttribute(EVENTS.onClick)) {
-		preloadOnHover(target);
+	} else if (target.tagName === 'A' && ! target.classList.contains('no-router') && ! target.hasAttribute(onClick)) {
+		preloadOnHover(target, target.dataset);
 	} else {
-		target.querySelectorAll(`a:not(.no-router, [${EVENTS.onClick}])`).forEach(a => preloadOnHover(a));
+		target.querySelectorAll(`a:not(.no-router, [${onClick}])`).forEach(a => preloadOnHover(a, a.dataset));
 	}
 }
 
@@ -303,17 +303,21 @@ function _getLinkStateData(a) {
 }
 
 function _interceptLinkClick(event) {
-	if (event.target.classList.contains('no-router') || event.target.hasAttribute(EVENTS.onClick)) {
+	if (event.target.classList.contains('no-router') || event.target.hasAttribute(onClick)) {
 		event.target.removeEventListener(_interceptLinkClick);
 	} else if (event.isTrusted && event.currentTarget.href.startsWith(location.origin)) {
 		event.preventDefault();
 		const state = _getLinkStateData(event.currentTarget);
-		navigate(event.currentTarget.href, state, { integrity: event.currentTarget.dataset.integrity });
+		navigate(event.currentTarget.href, state, {
+			integrity: event.currentTarget.dataset.integrity,
+			cache: event.currentTarget.dataset.cache,
+			referrerPolicy: event.currentTarget.dataset.referrerPolicy,
+		});
 	}
 };
 
 async function _interceptFormSubmit(event) {
-	if (event.target.classList.contains('no-router') || event.target.hasAttribute(EVENTS.onSubmit)) {
+	if (event.target.classList.contains('no-router') || event.target.hasAttribute(onSubmit)) {
 		event.target.removeEventListener('submit', _interceptFormSubmit);
 	} else if (event.isTrusted && event.target.action.startsWith(location.origin)) {
 		event.preventDefault();
@@ -343,12 +347,13 @@ async function _interceptFormSubmit(event) {
 	}
 }
 
-async function _getHTML(url, { signal, method = 'GET', body, integrity } = {}) {
+async function _getHTML(url, { signal, method = 'GET', body, integrity, cache = 'default', referrerPolicy = 'no-referrer' } = {}) {
 	const resp = await fetch(url, {
 		method,
 		body: NO_BODY_METHODS.includes(method.toUpperCase()) ? null : body,
 		headers: { 'Accept': 'text/html' },
-		referrerPolicy: 'no-referrer',
+		cache,
+		referrerPolicy,
 		integrity,
 		signal,
 	}).catch(err => err);
@@ -528,24 +533,24 @@ export function interceptNav(target = document.body, { signal } = {}) {
 		interceptNav(document.querySelector(target), { signal });
 	} else if (! (target instanceof HTMLElement || target instanceof ShadowRoot)) {
 		throw new TypeError('Cannot intercept navigation on a non-Element. Element or selector is required.');
-	} else if (target instanceof HTMLAnchorElement && ! target.classList.contains('no-router') && ! target.hasAttribute(EVENTS.onClick) && target.href.startsWith(location.origin)) {
+	} else if (target instanceof HTMLAnchorElement && ! target.classList.contains('no-router') && ! target.hasAttribute(onClick) && target.href.startsWith(location.origin)) {
 		target.addEventListener('click', _interceptLinkClick, { signal, passive: false });
-	} else if (target instanceof HTMLFormElement && ! target.classList.contains('no-router') && ! target.hasAttribute(EVENTS.onSubmit) && target.action.startsWith(location.origin)) {
+	} else if (target instanceof HTMLFormElement && ! target.classList.contains('no-router') && ! target.hasAttribute(onSubmit) && target.action.startsWith(location.origin)) {
 		target.addEventListener('submit', _interceptFormSubmit, { signal, passive: false });
 
-		target.querySelectorAll(`a[href]:not([rel~="external"], .no-router, [${EVENTS.onClick}])`).forEach(el => {
+		target.querySelectorAll(`a[href]:not([rel~="external"], .no-router, [${onClick}])`).forEach(el => {
 			if (el.href.startsWith(location.origin)) {
 				el.addEventListener('click', _interceptLinkClick, { passive: false, signal });
 			}
 		});
 	} else {
-		target.querySelectorAll(`a[href]:not([rel~="external"], .no-router, [${EVENTS.onClick}])`).forEach(el => {
+		target.querySelectorAll(`a[href]:not([rel~="external"], .no-router, [${onClick}])`).forEach(el => {
 			if (el.href.startsWith(location.origin)) {
 				el.addEventListener('click', _interceptLinkClick, { passive: false, signal });
 			}
 		});
 
-		target.querySelectorAll(`form:not(.no-router, [${EVENTS.onSubmit}])`).forEach(el => {
+		target.querySelectorAll(`form:not(.no-router, [${onSubmit}])`).forEach(el => {
 			el.addEventListener('submit', _interceptFormSubmit, { passive: false, signal });
 		});
 	}
@@ -694,6 +699,8 @@ export async function getModule(input = location, {
 	method = 'GET',
 	state = getStateObj(),
 	formData = new FormData(),
+	cache = 'default',
+	referrerPolicy = 'no-referrer',
 	integrity,
 	signal,
 } = {}) {
@@ -702,19 +709,18 @@ export async function getModule(input = location, {
 	if (input === null) {
 		throw new Error('Invalid path.');
 	} else if (! (input instanceof URL)) {
-		return await getModule(URL.parse(input, document.baseURI), { signal, method, formData, state, integrity });
+		return await getModule(URL.parse(input, document.baseURI), { signal, method, formData, state, integrity, cache, referrerPolicy });
 	} else {
 		const match = findPath(input);
 
 		if (! (match instanceof URLPattern)) {
-			return await _getHTML(input, { method, signal: getNavSignal({ signal }), body: formData, state, integrity });
+			return await _getHTML(input, { method, signal: getNavSignal({ signal }), body: formData, state, integrity, cache, referrerPolicy });
 		} else {
 			const handler = ROUTES_REGISTRY.get(match);
 			return await _handleModule(handler, {
 				url: input,
 				matches: match.exec(input),
 				state,
-				// signal: getNavSignal({ signal }),
 				method,
 				formData,
 				integrity,
@@ -738,6 +744,8 @@ export async function getModule(input = location, {
 export async function navigate(url, newState = getStateObj(), {
 	signal,
 	method = 'GET',
+	cache = 'default',
+	referrerPolicy = 'no-referrer',
 	formData,
 	integrity,
 	scrollRestoration = null,
@@ -747,7 +755,7 @@ export async function navigate(url, newState = getStateObj(), {
 	} else if (signal instanceof AbortSignal && signal.aborted) {
 		throw signal.reason;
 	} else if (! (url instanceof URL)) {
-		return await navigate(URL.parse(url, document.baseURI), newState, { signal, method, formData, integrity });
+		return await navigate(URL.parse(url, document.baseURI), newState, { signal, method, cache, referrerPolicy, formData, integrity });
 	} else if (formData instanceof FormData && NO_BODY_METHODS.includes(method.toUpperCase())) {
 		const params = new URLSearchParams(formData);
 
@@ -755,7 +763,7 @@ export async function navigate(url, newState = getStateObj(), {
 			url.searchParams.append(key, val);
 		}
 
-		return await navigate(url, newState, { signal, method, integrity });
+		return await navigate(url, newState, { signal, method, cache, referrerPolicy, integrity });
 	} else if (url.href !== location.href) {
 		try {
 			const oldState = getStateObj();
@@ -772,7 +780,7 @@ export async function navigate(url, newState = getStateObj(), {
 				}
 
 				history.pushState(newState, '', url);
-				const content = await getModule(url, { signal, method, formData, state: newState, integrity });
+				const content = await getModule(url, { signal, method, cache, referrerPolicy, formData, state: newState, integrity });
 				await notifyStateChange(diff);
 				_updatePage(content);
 
@@ -1104,30 +1112,13 @@ export async function preload(href, {
 
  * @param {string|URL} href - The URL or specifier to the resource to prefetch.
  * @param {Object} [options] - Optional options for the prefetch element.
- * @param {string} [options.crossOrigin="anonymous"] - The CORS mode to use when fetching the resource. Defaults to 'anonymous'.
- * @param {string} [options.referrerPolicy="no-referrer"] - The referrer policy to use when fetching the resource. Defaults to 'no-referrer'.
- * @param {string} [options.fetchPriority="auto"] - The fetch priority for the prefetch request. Defaults to 'auto'.
- * @param {string} [options.integrity] - A base64-encoded cryptographic hash of the resource
- * @param {string} [options.as] - The type of resource to prefetch.
- * @param {string} [options.type] - The MIME type of the resource to prefetch.
- * @param {(string|MediaQueryList)} [options.media] - A media query string or a MediaQueryList object.
- * @returns {Promise<void>} A promise that resolves when the resource is preloaded or rejects on error or signal is aborted.
- * @throws {Error} Throws if the signal is aborted or if an `error` event is fired on the preload.
  */
-export async function prefetch(href, {
-	crossOrigin = 'anonymous',
-	referrerPolicy = 'no-referrer',
-	fetchPriority = 'auto',
-	as,
-	integrity,
-	media,
-	type,
-} = {}) {
-
-	await _loadLink(href, {
-		relList: ['prefetch'],
-		crossOrigin, referrerPolicy, fetchPriority, as, signal: null, type, media, integrity,
-	});
+export function prefetch(href, { referrerPolicy = 'no-referrer' } = {}) {
+	const link = document.createElement('link');
+	link.referrerPolicy = referrerPolicy;
+	link.relList.add('prefetch');
+	link.href = href;
+	document.head.append(link);
 }
 
 /**
@@ -1301,7 +1292,7 @@ export async function preloadOnHover(target, {
 		&& target.origin === location.origin
 		&& URL.canParse(target.href)
 	) {
-		target.addEventListener('mouseenter', async ({ target }) => {
+		target.addEventListener('mouseover', async ({ target }) => {
 			const pattern = findPath(target.href);
 
 			if (pattern instanceof URLPattern) {
@@ -1326,8 +1317,6 @@ export async function preloadOnHover(target, {
 				resolve();
 			}
 		}, { once: true, passive: true, signal });
-	} else if (! (target instanceof HTMLElement && target.classList.contains('no-router'))) {
-		reject(new TypeError('Preload target must be a selector or an element with an `href` atttribute.'));
 	} else {
 		resolve();
 	}
@@ -1341,7 +1330,7 @@ export async function preloadOnHover(target, {
  * @param {HTMLElement|ShadowRoot|string} target Target for the mutation observer or its selector
  * @param {HTMLElement|ShadowRoot} [base=document] The element to query from if `target` is a selector
  */
-export function observePreloadsOn(target, base = document) {
+export function observePreloadsOn(target, base = document.documentElement) {
 	if (typeof target === 'string') {
 		observePreloadsOn(base.querySelector(target));
 	} else if (target instanceof HTMLElement || target instanceof ShadowRoot) {
@@ -1358,7 +1347,7 @@ export function observePreloadsOn(target, base = document) {
  * @param {HTMLElement|ShadowRoot|string} target Target for the mutation observers or its selector
  * @param {HTMLElement|ShadowRoot} [base=document] The element to query from if `target` is a selector
  */
-export function observe(target, base = document) {
+export function observe(target, base = document.documentElement) {
 	if (typeof target === 'string') {
 		observe(base.querySelector(target));
 	} else if (target instanceof HTMLElement || target instanceof ShadowRoot) {
