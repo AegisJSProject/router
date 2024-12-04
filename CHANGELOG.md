@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.2] - 2024-12-04
+
+### Added
+- Add support for `referrerPolicy` and other request config in preloading links
+
+### Fixed
+- Fix throwing errors when adding links to preload observer
+- Fix invalid attributes on `<link rel="prefetch">`
+- Fix invalid default types on some functions (use `document.documentElement` instead of `document`)
+
 ## [v1.1.1] - 2024-11-25
 
 ### Removed

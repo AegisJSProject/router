@@ -1,4 +1,4 @@
-import { init, back, forward, reload, registerPath, observePreloadsOn } from '@aegisjsproject/router/router.js';
+import { init, back, forward, reload, registerPath } from '@aegisjsproject/router/router.js';
 import { observeEvents } from '@aegisjsproject/core/events.js';
 import { reset } from '@aegisjsproject/styles/reset.js';
 import { baseTheme, lightTheme, darkTheme } from '@aegisjsproject/styles/theme.js';
@@ -33,6 +33,7 @@ init('#routes', {
 	notFound: '/test/views/404.js',
 	rootEl: '#root',
 	inteceptRoot: document.body,
+	observePreloads: true,
 	transition: {
 		keyframes: {
 			opacity: [1, 0],
@@ -45,8 +46,6 @@ init('#routes', {
 	},
 	signal: controller.signal,
 }).finally(() => console.timeEnd('init'));
-
-observePreloadsOn('#nav');
 
 registerPath('/product/?id=:productId', ({ matches }) => URL.parse(`${location.origin}/product/${matches.search.groups.productId}`));
 
