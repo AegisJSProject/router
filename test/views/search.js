@@ -1,5 +1,6 @@
-import { manageSearch, url, navigate } from '@aegisjsproject/router/router.js';
-import { EVENTS } from '@aegisjsproject/core/events.js';
+import { url, navigate } from '@aegisjsproject/router/router.js';
+import { manageSearch } from '@aegisjsproject/url/url.js';
+import { EVENTS } from '@aegisjsproject/callback-registry/events.js';
 import { FUNCS } from '@aegisjsproject/core/callbackRegistry.js';
 import { registerCallback } from '@aegisjsproject/core/callbackRegistry.js';
 
