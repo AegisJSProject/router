@@ -1,7 +1,7 @@
 import { getStateObj, diffState, notifyStateChange } from '@aegisjsproject/state';
 export { url } from '@aegisjsproject/url/url.js';
 import { onClick, onSubmit } from '@aegisjsproject/callback-registry/events.js';
-console.log({ onClick, onSubmit });
+
 const isModule = ! (document.currentScript instanceof HTMLScriptElement);
 const SUPPORTS_IMPORTMAP = HTMLScriptElement.supports('importmap');
 const ROUTES_REGISTRY = new Map();
