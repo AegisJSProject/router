@@ -538,13 +538,13 @@ export function interceptNav(target = document.body, { signal } = {}) {
 	} else if (target instanceof HTMLFormElement && ! target.classList.contains('no-router') && ! target.hasAttribute(onSubmit) && target.action.startsWith(location.origin)) {
 		target.addEventListener('submit', _interceptFormSubmit, { signal, passive: false });
 
-		target.querySelectorAll(`a[href]:not([rel~="external"], .no-router, [${onClick}])`).forEach(el => {
+		target.querySelectorAll(`a[href]:not([rel~="external"], [download], .no-router, [${onClick}])`).forEach(el => {
 			if (el.href.startsWith(location.origin)) {
 				el.addEventListener('click', _interceptLinkClick, { passive: false, signal });
 			}
 		});
 	} else {
-		target.querySelectorAll(`a[href]:not([rel~="external"], .no-router, [${onClick}])`).forEach(el => {
+		target.querySelectorAll(`a[href]:not([rel~="external"], [download], .no-router, [${onClick}])`).forEach(el => {
 			if (el.href.startsWith(location.origin)) {
 				el.addEventListener('click', _interceptLinkClick, { passive: false, signal });
 			}
@@ -1290,6 +1290,7 @@ export async function preloadOnHover(target, {
 		&& ! target.classList.contains('no-router')
 		&& typeof target.href === 'string'
 		&& target.origin === location.origin
+		&& target.download.length === 0
 		&& URL.canParse(target.href)
 	) {
 		target.addEventListener('mouseover', async ({ target }) => {
