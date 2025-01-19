@@ -1293,26 +1293,26 @@ export async function preloadOnHover(target, {
 		&& target.download.length === 0
 		&& URL.canParse(target.href)
 	) {
-		target.addEventListener('mouseover', async ({ target }) => {
-			const pattern = findPath(target.href);
+		target.addEventListener('mouseover', async ({ target: currentTarget }) => {
+			const pattern = findPath(currentTarget.href);
 
 			if (pattern instanceof URLPattern) {
 				await preloadModule(ROUTES_REGISTRY.get(pattern), {
 					fetchPriority,
 					referrerPolicy,
 					crossOrigin,
-					integrity: target.dataset.integrity,
+					integrity: currentTarget.dataset.integrity,
 					signal,
 				});
 				resolve();
 			} else {
-				await preload(target.href, {
+				await preload(currentTarget.href, {
 					fetchPriority,
 					crossOrigin,
 					referrerPolicy,
-					as: target.dataset.preloadAs ?? 'fetch',
-					type: target.dataset.preloadType ?? 'text/html',
-					integrity: target.dataset.integrity,
+					as: currentTarget.dataset.preloadAs ?? 'fetch',
+					type: currentTarget.dataset.preloadType ?? 'text/html',
+					integrity: currentTarget.dataset.integrity,
 					signal,
 				});
 				resolve();
