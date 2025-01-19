@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.6] - 2025-01-18
+
+### Fixed
+- Fixed target for `mouseover` preloading
+
 ## [v1.1.5] - 2025-01-07
 
 ### Fixed
