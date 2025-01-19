@@ -1293,7 +1293,7 @@ export async function preloadOnHover(target, {
 		&& target.download.length === 0
 		&& URL.canParse(target.href)
 	) {
-		target.addEventListener('mouseover', async ({ target: currentTarget }) => {
+		target.addEventListener('mouseover', async ({ currentTarget }) => {
 			const pattern = findPath(currentTarget.href);
 
 			if (pattern instanceof URLPattern) {
