@@ -10,11 +10,11 @@ export default class BaconIpsum extends HTMLElement {
 	#lines = 0;
 	#signal;
 
-	constructor({ matches, signal }) {
+	constructor({ params: { lines = 5 }, signal }) {
 		super();
 		this.#signal = signal;
 		this.#shadow = this.attachShadow({ mode: 'closed' });
-		this.#lines = matches?.pathname?.groups?.lines ?? 5;
+		this.#lines = lines ?? 5;
 		signal.addEventListener('abort', ( {target }) => console.info(target.reason));
 
 		new CSSStyleSheet().replace(`
@@ -58,5 +58,5 @@ export default class BaconIpsum extends HTMLElement {
 
 customElements.define('bacon-ipusm', BaconIpsum);
 
-export const title = ({ matches }) => `Bacon Ipsum (${ matches?.pathname?.groups?.lines ?? 5} lines)`;
+export const title = ({ params: { lines }}) => `Bacon Ipsum (${ lines ?? 5} lines)`;
 export const description = 'Like Lorem Ipsum, but more meat!';

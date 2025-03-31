@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.8] - 2025-03-31
+
+### Added
+- Add `params` object (from `matches`)
+
 ## [v1.1.7] - 2025-01-18
 
 ### Fixed

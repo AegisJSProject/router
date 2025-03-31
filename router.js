@@ -409,21 +409,21 @@ function _updatePage(content) {
 	}
 }
 
-async function _handleMetadata({ title, description } = {}, { state, matches, url, signal } = {}) {
+async function _handleMetadata({ title, description } = {}, { state, matches, params, url, signal } = {}) {
 	if (typeof title === 'string') {
 		setTitle(title);
 	} else if (typeof title === 'function') {
-		setTitle(await title({ state, matches, url, signal }));
+		setTitle(await title({ state, matches, params, url, signal }));
 	}
 
 	if (typeof description === 'string') {
 		setDescription(description);
 	} else if (typeof description === 'function') {
-		setDescription(await description({ state, matches, url, signal }));
+		setDescription(await description({ state, matches, params, url, signal }));
 	}
 }
 
-async function _handleModule(moduleSrc, { state = getStateObj(), matches = {}, signal, ...args } = {}) {
+async function _handleModule(moduleSrc, { state = getStateObj(), matches = {}, params = {}, signal, ...args } = {}) {
 	const module = await Promise.try(() => {
 		if (moduleSrc instanceof Function) {
 			return moduleSrc(args);
@@ -453,28 +453,30 @@ async function _handleModule(moduleSrc, { state = getStateObj(), matches = {}, s
 			);
 		}
 
-		_handleMetadata(module, { state, matches, url, signal });
+		_handleMetadata(module, { state, matches, params, url, signal });
 
 		return new module.default({
 			url,
 			matches,
+			params,
 			state,
 			timestamp,
 			signal: getNavSignal({ signal }),
 			...args
 		});
 	} else if (module.default instanceof Function) {
-		_handleMetadata(module, { state, matches, url, signal });
+		_handleMetadata(module, { state, matches, params, url, signal });
 		return await module.default({
 			url,
 			matches,
+			params,
 			state,
 			timestamp,
 			signal: getNavSignal({ signal }),
 			...args
 		});
 	} else if (module.default instanceof Node || module.default instanceof Error) {
-		_handleMetadata(module, { state, matches, url, signal });
+		_handleMetadata(module, { state, matches, params, url, signal });
 		_updatePage(module.default);
 	} else {
 		throw new TypeError(`${moduleSrc} has a missing or invalid default export.`);
@@ -717,9 +719,18 @@ export async function getModule(input = location, {
 			return await _getHTML(input, { method, signal: getNavSignal({ signal }), body: formData, state, integrity, cache, referrerPolicy });
 		} else {
 			const handler = ROUTES_REGISTRY.get(match);
+			const matches = match.exec(input);
+			const params = typeof matches === 'object'
+				? {
+					...matches.protocol.groups, ...matches.username.groups, ...matches.password.groups, ...matches.hostname.groups,
+					...matches.port.groups, ...matches.pathname.groups, ...matches.search.groups, ...matches.hash.groups,
+				} : {};
+			delete params['0'];
+
 			return await _handleModule(handler, {
 				url: input,
-				matches: match.exec(input),
+				matches,
+				params,
 				state,
 				method,
 				formData,
