@@ -6,24 +6,31 @@ import { btn, btnPrimary, btnSuccess, btnDanger, btnLink } from '@aegisjsproject
 import { properties } from '@aegisjsproject/styles/properties.js';
 import { positions, displays } from '@aegisjsproject/styles/misc.js';
 
+const controller = new TaskController({ priority: 'background' });
+
 const customStyle = new CSSStyleSheet();
-customStyle.replace(`#nav, dialog::backdrop {
-	background-color: rgba(0, 0, 0, 0.6);
-	backdrop-filter: blur(4px);
-}
+customStyle.replace(`
+	body {
+		min-height: 100dvh;
+	}
 
-dialog {
-	border: none;
-	border-radius: 4px;
-}
+	#nav, dialog::backdrop {
+		background-color: rgba(0, 0, 0, 0.6);
+		backdrop-filter: blur(4px);
+	}
 
-.flex.wrap {
-	flex-wrap: wrap;
-}`);
+	dialog {
+		border: none;
+		border-radius: 4px;
+	}
+
+	.flex.wrap {
+		flex-wrap: wrap;
+	}
+`);
 
 document.adoptedStyleSheets = [properties, reset, baseTheme, lightTheme, darkTheme, btn, btnPrimary, btnSuccess, btnDanger, btnLink, positions, displays, customStyle];
 
-const controller = new AbortController();
 globalThis.controller = controller;
 
 console.time('init');
@@ -47,7 +54,7 @@ init('#routes', {
 	signal: controller.signal,
 }).finally(() => console.timeEnd('init'));
 
-registerPath('/product/?id=:productId', ({ matches }) => URL.parse(`${location.origin}/product/${matches.search.groups.productId}`));
+registerPath('/product/?id=:productId', ({ params: { productId } }) => URL.parse(`${location.origin}/product/${productId}`));
 
 document.querySelectorAll('[data-nav]').forEach(el => {
 	el.addEventListener('click', ({ currentTarget }) => {

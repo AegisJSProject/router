@@ -9,5 +9,5 @@ export default ({ url, method }) => {
 	return div;
 }
 
-export const title = () => `404 <${location.href}> Not Found`;
-export const description = () => `404 <${location.href}> Not Found`;
+export const title = ({ url }) => `404 <${url}> Not Found`;
+export const description = ({ url }) => `404 <${url}> Not Found`;

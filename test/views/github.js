@@ -6,9 +6,10 @@ const [users, setUsers] = manageState('github:users', {});
 preconnect('https://api.github.com');
 preconnect('https://avatars.githubusercontent.com');
 
-export default async ({ matches, signal }) => {
-	const username = matches?.pathname?.groups?.username;
-
+export default async ({
+	params: { username },
+	signal,
+}) => {
 	if (typeof username !== 'string') {
 		return `<p>Error: No GitHub username provided.</p>`;
 	} else if (! (username in users)) {
@@ -38,5 +39,5 @@ export default async ({ matches, signal }) => {
 	</section>`;
 };
 
-export const title = ({ matches }) => `GitHub Profile for ${matches.pathname.groups.username}`;
-export const description = ({ matches }) => `GitHub Profile for ${matches.pathname.groups.username}`;
+export const title = ({ params: { username } }) => `GitHub Profile for ${username}`;
+export const description = ({ params: { username } }) => `GitHub Profile for ${username}`;
