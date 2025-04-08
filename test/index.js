@@ -7,8 +7,14 @@ import { properties } from '@aegisjsproject/styles/properties.js';
 import { positions, displays } from '@aegisjsproject/styles/misc.js';
 
 const controller = new TaskController({ priority: 'background' });
-
 const customStyle = new CSSStyleSheet();
+
+trustedTypes.createPolicy('default', {
+	createHTML(input, config) {
+		return Document.parseHTML(input, config).body.innerHTML;
+	}
+});
+
 customStyle.replace(`
 	body {
 		min-height: 100dvh;

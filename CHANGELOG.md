@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.9] - 2025-04-08
+
+### Added
+- Add `aria-live` to a given root element
+- Improved support for Trusted Types
+
+### Fixed
+- Avoid aborting signals too early
+
 ## [v1.1.8] - 2025-03-31
 
 ### Added

@@ -15,6 +15,8 @@ const NAV_CLOSE_SYMBOL = Symbol.for('aegis:navigate:event:close');
 const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 let rootEl = document.getElementById(ROOT_ID) ?? document.body;
 let rootSelector = '#' + ROOT_ID;
+const SUPPORTS_TRUSTED_TYPES = 'trustedTypes' in globalThis;
+const _isTrustedHTML = input => SUPPORTS_TRUSTED_TYPES && trustedTypes.isHTML(input);
 
 function _handlePreloadMutations(target) {
 	if (target instanceof MutationRecord) {
@@ -151,7 +153,7 @@ export class AegisNavigationEvent extends CustomEvent {
 }
 
 // Need this to be "unsafe" to not be restrictive on what modifications can be made to a page
-const policy = 'trustedTypes' in globalThis
+const policy = SUPPORTS_TRUSTED_TYPES
 	? trustedTypes.createPolicy('aegis-router#html', { createHTML: input => input })
 	: Object.freeze({ createPolicy: input => input });
 
@@ -188,7 +190,7 @@ function _loadLink(href, {
 	crossOrigin = 'anonymous',
 	referrerPolicy = 'no-referrer',
 	fetchPriority = 'auto',
-	signal: passedSignal = AbortSignal.timeout(5000),
+	signal: passedSignal,
 	as,
 	integrity,
 	media,
@@ -230,7 +232,7 @@ function _loadLink(href, {
 
 		if (link.relList.contains('preload') || link.relList.contains('modulepreload')) {
 			const controller = new AbortController();
-			const signal = AbortSignal.any([controller.signal, passedSignal]);
+			const signal = passedSignal instanceof AbortSignal ? AbortSignal.any([controller.signal, passedSignal]) : controller.signal;
 
 			passedSignal.addEventListener('abort', ({ target }) => {
 				reject(target.reason);
@@ -390,6 +392,8 @@ function _updatePage(content) {
 		_updatePage(content());
 	} else if (typeof content === 'string') {
 		rootEl.setHTMLUnsafe(policy.createHTML(content));
+	} else if (_isTrustedHTML(content)) {
+		rootEl.setHTMLUnsafe(content);
 	} else if (content instanceof Error) {
 		reportError(content);
 		rootEl.textContent = content.message;
@@ -404,7 +408,13 @@ function _updatePage(content) {
 			const target = document.getElementById(location.hash.substring(1)) ?? document.body;
 			target.scrollIntoView({ behavior: prefersReducedMotion.matches ? 'instant' : 'smooth' });
 		} else {
-			document.body.scrollIntoView({ behavior: prefersReducedMotion.matches ? 'instant' : 'smooth' });
+			const autofocus = rootEl.querySelector('[autofocus]');
+
+			if (autofocus instanceof Element) {
+				autofocus.focus();
+			} else {
+				document.body.scrollIntoView({ behavior: prefersReducedMotion.matches ? 'instant' : 'smooth' });
+			}
 		}
 	}
 }
@@ -567,6 +577,10 @@ export function setRoot(target, selector) {
 	if (target instanceof HTMLElement) {
 		rootEl = target;
 		rootSelector = typeof selector === 'string' ? selector : target.hasAttribute('id') ? `#${target.id}` : null;
+
+		if (typeof rootEl.ariaLive !== 'string') {
+			rootEl.ariaLive = 'assertive';;
+		}
 	} else if (typeof target === 'string') {
 		setRoot(document.querySelector(target), target);
 	} else {
@@ -725,6 +739,7 @@ export async function getModule(input = location, {
 					...matches.protocol.groups, ...matches.username.groups, ...matches.password.groups, ...matches.hostname.groups,
 					...matches.port.groups, ...matches.pathname.groups, ...matches.search.groups, ...matches.hash.groups,
 				} : {};
+
 			delete params['0'];
 
 			return await _handleModule(handler, {
@@ -1019,6 +1034,8 @@ export async function init(routes, {
 
 		if (root instanceof HTMLElement || root instanceof ShadowRoot || typeof root === 'string') {
 			setRoot(root);
+		} else if (rootEl instanceof HTMLElement && typeof rootEl.ariaLive !== 'string') {
+			rootEl.ariaLive = 'assertive';
 		}
 
 		if (inteceptRoot instanceof HTMLElement || inteceptRoot instanceof ShadowRoot || typeof inteceptRoot === 'string') {
@@ -1206,7 +1223,7 @@ export function getNavController({ signal, reasons = DEFAULT_REASONS } = {}) {
 
 		EVENT_TARGET.addEventListener(NAV_EVENT, event => {
 			if (reasons.includes(event.reason)) {
-				controller.abort(`Navigated away from ${location.href}.`);
+				setTimeout(controller.abort.bind(controller), 50, `Navigated away from ${location.href}.`);
 			}
 		}, { passive: true, signal: controller.signal });
 

@@ -20,7 +20,7 @@ export default (params) => {
 	return `
 		<form action="/search" id="search" ${EVENTS.onSubmit}="${submitHandler}" method="GET">
 			<label for="query">Query</label>
-			<input type="search" id="query" name="q" placeholder="Search for..." value="${query}" ${EVENTS.onChange}="${FUNCS.debug.info}" ${EVENTS.onInput}="${inputHandler}" required="" />
+			<input type="search" id="query" name="q" placeholder="Search for..." value="${query}" ${EVENTS.onChange}="${FUNCS.debug.info}" ${EVENTS.onInput}="${inputHandler}" autofocus="" required="" />
 			<button type="submit" class="btn btn-primary">Search</button>
 		</form>
 		<pre><code>${JSON.stringify(params, null, 4)}</code></pre>
