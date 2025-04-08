@@ -1,6 +1,6 @@
 {
   "name": "@aegisjsproject/router",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "description": "A simple but powerful router module",
   "keywords": [
     "router",
@@ -58,7 +58,8 @@
   },
   "scripts": {
     "test": "npm run lint:js && npm run run:tests",
-    "start": "http-server ${npm_package_config_serve_path} -c-1 --port ${npm_package_config_serve_port} --gzip true --brotli true -a ${npm_package_config_serve_domain} -o /test/",
+    "start": "http-server -c ./http.config.js",
+    "start-x": "http-server ${npm_package_config_serve_path} -c-1 --port ${npm_package_config_serve_port} --gzip true --brotli true -a ${npm_package_config_serve_domain} -o /test/",
     "preversion": "npm test && npm run build",
     "prepare": "npm test && npm run build",
     "lint:js": "eslint .",
@@ -103,8 +104,8 @@
     "@rollup/plugin-node-resolve": "^16.0.0",
     "@rollup/plugin-terser": "^0.4.4",
     "@shgysk8zer0/eslint-config": "^1.0.4",
+    "@shgysk8zer0/http-server": "^1.1.1",
     "eslint": "^9.23.0",
-    "http-server": "^14.1.1",
     "rollup": "^4.38.0"
   }
 }

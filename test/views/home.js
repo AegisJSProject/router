@@ -1,6 +1,12 @@
 import { btn, btnOutlineDanger, btnOutlineInfo } from '@aegisjsproject/styles/button.js';
 import { positions } from '@aegisjsproject/styles/misc.js';
 
+const policy = trustedTypes.createPolicy('home#html', {
+	createHTML(input) {
+		return input;
+	}
+});
+
 const styles = await new CSSStyleSheet().replace(`:popover-open {
 	display: block;
 	max-height: 90dvh;
@@ -23,10 +29,10 @@ const styles = await new CSSStyleSheet().replace(`:popover-open {
 	padding: 0.3em;
 }`);
 
-export default ({ url, state, timestamp, matches, signal }) => {
+export default ({ url, state, timestamp, matches, params, signal }) => {
 	const el = document.createElement('div');
 
-	el.setHTMLUnsafe(`<div>
+	el.setHTMLUnsafe(policy.createHTML(`<div>
 		<template shadowrootmode="open" shadowrootserializable="">
 			<div part="popover" popover="manual" id="popover">
 				<div part="header" class="header sticky top z-4">
@@ -36,18 +42,18 @@ export default ({ url, state, timestamp, matches, signal }) => {
 			</div>
 			<button type="button" popovertarget="popover" popovertargetaction="show" class="btn btn-outline-info">Show Popover</button>
 		</template>
-		<code slot="content">${JSON.stringify({ url, state, timestamp, matches, signal: { aborted: signal.aborted }}, null, 4)}</code>
-	</div>`);
+		<code slot="content">${JSON.stringify({ url, state, timestamp, matches, params, signal: { aborted: signal.aborted, reason: signal.reason }}, null, 4)}</code>
+	</div>`));
 
 	signal.addEventListener('abort', () => {
-		if (el.firstElementChild.isConnected) {
+		if (el.isConnected) {
 			el.firstElementChild.shadowRoot.getElementById('popover').hidePopover();
 		}
 	}, { once: true });
 
 	el.firstElementChild.shadowRoot.adoptedStyleSheets = [btn, btnOutlineDanger, btnOutlineInfo, positions, styles];
 
-	return el.firstElementChild;
+	return el;
 };
 
 export const title = 'AegisJSProject Home';
