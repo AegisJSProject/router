@@ -1082,7 +1082,7 @@ export async function init(routes, {
  * @param {string} [options.referrerPolicy="no-referrer"] - The referrer policy to use when fetching the module. Defaults to 'no-referrer'.
  * @param {string} [options.fetchPriority="low"] - The fetch priority for the preload request. Defaults to 'auto'.
  * @param {string} [options.as="script"] - The type of resource to preload. Defaults to 'script'.
- * @param {AbortSignal} [options.signal=AbortSignal.timeout(5000)] - An AbortSignal to abort the preload request. Defaults to a 5-second timeout.
+ * @param {AbortSignal} [options.signal] - An AbortSignal to abort the preload request. Defaults to a 5-second timeout.
  * @param {string} [options.integrity] - A base64-encoded cryptographic hash of the resource
  * @returns {Promise<void>} A promise that resolves when the module is preloaded or rejects on error or signal is aborted.
  * @throws {Error} Throws if the signal is aborted or if an `error` event is fired on the preload.
@@ -1092,7 +1092,7 @@ export async function preloadModule(src, {
 	referrerPolicy = 'no-referrer',
 	fetchPriority = 'low',
 	as = 'script',
-	signal = AbortSignal.timeout(5000),
+	signal,
 	integrity,
 } = {}) {
 
@@ -1110,7 +1110,7 @@ export async function preloadModule(src, {
  * @param {string} [options.crossOrigin="anonymous"] - The CORS mode to use when fetching the resource. Defaults to 'anonymous'.
  * @param {string} [options.referrerPolicy="no-referrer"] - The referrer policy to use when fetching the resource. Defaults to 'no-referrer'.
  * @param {string} [options.fetchPriority="auto"] - The fetch priority for the preload request. Defaults to 'auto'.
- * @param {AbortSignal} [options.signal=AbortSignal.timeout(5000)] - An AbortSignal to abort the preload request. Defaults to a 5-second timeout.
+ * @param {AbortSignal} [options.signal] - An AbortSignal to abort the preload request. Defaults to a 5-second timeout.
  * @param {string} [options.integrity] - A base64-encoded cryptographic hash of the resource
  * @param {string} [options.as] - The type of resource to preload.
  * @param {string} [options.type] - The MIME type of the resource to preload.
@@ -1122,7 +1122,7 @@ export async function preload(href, {
 	crossOrigin = 'anonymous',
 	referrerPolicy = 'no-referrer',
 	fetchPriority = 'auto',
-	signal = AbortSignal.timeout(5000),
+	signal,
 	as,
 	integrity,
 	media,
