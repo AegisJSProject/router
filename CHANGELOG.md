@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.11] - 2025-04-25
+
+### Fixed
+- Check for `passedSignal` being given before adding listener
+- Do not handle link clicks with modifier keys (eg to open in new tab)
+
 ## [v1.1.10] - 2025-04-24
 
 ### Fixed
