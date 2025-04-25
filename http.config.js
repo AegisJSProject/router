@@ -1,8 +1,23 @@
+import { readFile } from 'node:fs/promises';
+const home = await readFile('./test/index.html');
+const getHome = () => new Response(home, { headers: { 'Content-Type': 'text/html' }});
 const cache = new Map();
 
 export default {
 	open: true,
 	pathname: '/test/',
+	routes: {
+		'/favicon.svg': () => new Response(`<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 10 10">
+	<rect x="0" y="0" rx="10" ry="10" width="10" height="10" fill="#${crypto.getRandomValues(new Uint8Array(3)).toHex()}"></rect>
+</svg>`, { headers: { 'Content-Type': 'image/svg+xml' }}),
+		'/product/:productId': getHome,
+		'/page/markdown': getHome,
+		'/test/': getHome,
+		'/search?q=:query': getHome,
+		'/img/:fill([A-Fa-f\\d]{3,6})?/:size(\\d+)?/:radius(\\d+)?': getHome,
+		'/page/bacon/:lines(\\d+)': getHome,
+		'/github/:username(\\w+)': getHome,
+	},
 	requestPreprocessors: [
 		req => {
 			if (cache.has(req.url)) {

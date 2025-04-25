@@ -234,9 +234,11 @@ function _loadLink(href, {
 			const controller = new AbortController();
 			const signal = passedSignal instanceof AbortSignal ? AbortSignal.any([controller.signal, passedSignal]) : controller.signal;
 
-			passedSignal.addEventListener('abort', ({ target }) => {
-				reject(target.reason);
-			}, { signal: controller.signal });
+			if (passedSignal instanceof AbortSignal) {
+				passedSignal.addEventListener('abort', ({ target }) => {
+					reject(target.reason);
+				}, { signal: controller.signal, once: true  });
+			}
 
 			link.referrerPolicy = referrerPolicy;
 
@@ -307,7 +309,11 @@ function _getLinkStateData(a) {
 function _interceptLinkClick(event) {
 	if (event.target.classList.contains('no-router') || event.target.hasAttribute(onClick)) {
 		event.target.removeEventListener(_interceptLinkClick);
-	} else if (event.isTrusted && event.currentTarget.href.startsWith(location.origin)) {
+	} else if (
+		event.isTrusted
+		&& event.currentTarget.href.startsWith(location.origin)
+		&& ! (event.metaKey || event.ctrlKey || event.shiftKey)
+	) {
 		event.preventDefault();
 		const state = _getLinkStateData(event.currentTarget);
 		navigate(event.currentTarget.href, state, {
@@ -316,7 +322,7 @@ function _interceptLinkClick(event) {
 			referrerPolicy: event.currentTarget.dataset.referrerPolicy,
 		});
 	}
-};
+}
 
 async function _interceptFormSubmit(event) {
 	if (event.target.classList.contains('no-router') || event.target.hasAttribute(onSubmit)) {

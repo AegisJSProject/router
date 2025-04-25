@@ -1,6 +1,6 @@
 {
   "name": "@aegisjsproject/router",
-  "version": "1.1.10",
+  "version": "1.1.11",
   "description": "A simple but powerful router module",
   "keywords": [
     "router",
