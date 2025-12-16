@@ -15,6 +15,7 @@ const submitHandler = registerCallback('search:submit', async event => {
 });
 
 export default (params) => {
+	console.log(params);
 	params.signal.addEventListener('abort', console.log, { once: true });
 
 	return `

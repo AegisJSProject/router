@@ -1,3 +1,4 @@
+import { sanitizer } from '@aegisjsproject/sanitizer/config/base.js';
 import { init, back, forward, reload, registerPath } from '@aegisjsproject/router/router.js';
 import { observeEvents } from '@aegisjsproject/core/events.js';
 import { reset } from '@aegisjsproject/styles/reset.js';
@@ -10,8 +11,10 @@ const controller = new TaskController({ priority: 'background' });
 const customStyle = new CSSStyleSheet();
 
 trustedTypes.createPolicy('default', {
-	createHTML(input, config) {
-		return Document.parseHTML(input, config).body.innerHTML;
+	createHTML(input, config = { sanitizer }) {
+		const el = document.createElement('div');
+		el.setHTML(input, config);
+		return el.innerHTML;
 	}
 });
 

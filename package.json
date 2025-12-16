@@ -99,12 +99,15 @@
   },
   "devDependencies": {
     "@aegisjsproject/component": "^0.1.6",
-    "@aegisjsproject/core": "^0.2.22",
+    "@aegisjsproject/core": "^0.2.27",
+    "@aegisjsproject/dev-server": "^1.0.5",
+    "@aegisjsproject/http-utils": "^1.0.4",
     "@aegisjsproject/url": "^1.0.3",
     "@rollup/plugin-node-resolve": "^16.0.0",
     "@rollup/plugin-terser": "^0.4.4",
     "@shgysk8zer0/eslint-config": "^1.0.4",
     "@shgysk8zer0/http-server": "^1.1.1",
+    "@shgysk8zer0/importmap": "^1.5.4",
     "eslint": "^9.23.0",
     "rollup": "^4.38.0"
   }
