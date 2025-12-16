@@ -1294,6 +1294,8 @@ export async function whenNavigated({ signal, reasons = DEFAULT_REASONS } = {}) 
 	return promise;
 }
 
+export const whenLoaded = async ({ signal }) => await whenNavigated({ signal, reasons: [EVENT_TYPES.load]});
+
 /**
  * Preloads resources associated with an element or selector when hovered over, with optional configuration.
  *

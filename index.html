@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" class="preload">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width" />
+		<meta name="color-scheme" content="light dark" />
+		<title>AegisJSProject Router</title>
+		<base href="/" />
+		<script type="importmap" integrity="{{ INTEGRITY }}">{{ IMPORTMAP }}</script>
+		<script type="application/javascript" defer="" referrerpolicy="no-referrer" fetchpriority="high" crossorigin="anonymous" src="https://unpkg.com/@shgysk8zer0/polyfills@0.5.3/browser.min.js"></script>
+		<script type="module" src="/test/index.js"></script>
+		<link rel="icon" href="/favicon.svg" sizes="any" type="image/svg+xml" />
+		<script type="application/json" id="routes">
+			{
+				"/product/:productId": "@aegisjsproject/router/test/views/product.js",
+				"/page/markdown": "@aegisjsproject/router/test/views/markdown.js",
+				"/test/": "@aegisjsproject/router/test/views/home.js",
+				"/search?q=:query": "@aegisjsproject/router/test/views/search.js",
+				"/img/:fill([A-Fa-f\\d]{3,6})?/:size(\\d+)?/:radius(\\d+)?": "@aegisjsproject/router/test/views/img.js",
+				"/page/bacon/:lines(\\d+)": "@aegisjsproject/router/test/views/bacon.js",
+				"/github/:username(\\w+)": "@aegisjsproject/router/test/views/github.js"
+			}
+		</script>
+	</head>
+	<body>
+		<nav id="nav" class="sticky top z-4 flex wrap">
+			<button type="button" class="btn btn-primary" data-nav="back" accesskey="&lt;">Back</button>
+			<a class="btn btn-link" href="/" accesskey="h">Home</a>
+			<button type="button" class="btn btn-primary" data-nav="forward" accesskey="&gt;">Forward</button>
+			<button type="button" class="btn btn-primary" data-nav="reload" accesskey="r">Reload</button>
+			<a href="/test/views/" class="btn btn-link" data-cache="force-cache" data-referrer-policy="origin">HTML Page</a>
+			<a class="btn btn-link" href="/product/1" data-aegis-state-name="Product 1" data-aegis-state-foo="bar" accesskey="1">Product 1</a>
+			<a class="btn btn-link" href="/product/2" data-aegis-state-name="Product 2" accesskey="2">Product 2</a>
+			<a href="/product/3" class="btn btn-link" data-aegis-state-name="Product 3" accesskey="3">Product 3</a>
+			<a href="/page/markdown" class="btn btn-link" accesskey="m">Markdown Test</a>
+			<a href="/page/bacon/5" class="btn btn-link" accesskey="b">Bacon Ipsum (5 lines)</a>
+			<a href="/github/AegisJSProject" class="btn btn-link" accesskey="g">AegisJSProject on GitHub</a>
+			<a href="/github/kernvalley" class="btn btn-link">kernvalley on GitHub</a>
+			<a href="/test/views/" class="btn btn-link no-router">Native</a>
+			<a class="btn btn-link" href="/search?q=shoes" accesskey="?">Search for Shoes</a>
+			<a class="btn btn-link" href="/img" accesskey="i">Random Image</a>
+			<a class="btn btn-link" href="/img/f00/400/5" accesskey="c">Big Red Circle Image</a>
+			<a class="btn btn-link" href="/dne" accesskey="x">404 Page</a>
+			<a class="btn btn-link" href="./" download="index.html" accesskey="d">Download</a>
+		</nav>
+		<div id="root">
+			<stateful-el></stateful-el>
+		</div>
+	</body>
+</html>

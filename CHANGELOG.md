@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.12] - 2025-12-16
+
+### Changed
+- Update dependencies
+- Update publishing on npm
+
 ## [v1.1.11] - 2025-04-25
 
 ### Fixed
