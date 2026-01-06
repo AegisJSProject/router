@@ -2,15 +2,14 @@ import { imports } from '@shgysk8zer0/importmap';
 import { useDefaultCSP, addScriptSrc, addConnectSrc, addTrustedTypePolicy, lockCSP } from '@aegisjsproject/http-utils/csp.js';
 
 addScriptSrc(
-	// imports['@shgysk8zer0/polyfills'],
-	'https://unpkg.com/@shgysk8zer0/polyfills@0.5.3/browser.min.js',
+	imports['@shgysk8zer0/polyfills'],
 	'https://unpkg.com/@aegisjsproject/',
 	imports.marked,
 	imports['marked-highlight'],
 	imports['@highlightjs/cdn-assets/'],
 );
 addConnectSrc('https://api.github.com/users/', 'https://baconipsum.com/api/');
-addTrustedTypePolicy('aegis-router#html', 'aegis-sanitizer#html', 'default');
+addTrustedTypePolicy('aegis-router#html', 'aegis-sanitizer#html', 'aegis-escape#html', 'default');
 lockCSP();
 
 export default {
