@@ -9,9 +9,11 @@ export default class BaconIpsum extends HTMLElement {
 	#shadow;
 	#lines = 0;
 	#signal;
+	#resolvers = Promise.withResolvers();
 
-	constructor({ params: { lines = 5 }, signal }) {
+	constructor({ params: { lines = 5 }, stack, signal }) {
 		super();
+		stack.use(this);
 		this.#signal = signal;
 		this.#shadow = this.attachShadow({ mode: 'closed' });
 		this.#lines = lines ?? 5;
@@ -26,6 +28,11 @@ export default class BaconIpsum extends HTMLElement {
 					display: block;
 				}
 			`).then(sheet => this.#shadow.adoptedStyleSheets = [sheet]);
+	}
+
+	async [Symbol.asyncDispose]() {
+		await this.#resolvers.promise;
+		console.log(this.getHTML({ shadowRoots: [this.#shadow], serializableShadowRoots: true }));
 	}
 
 	async connectedCallback() {
@@ -53,6 +60,7 @@ export default class BaconIpsum extends HTMLElement {
 		});
 
 		this.#shadow.replaceChildren(frag);
+		this.#resolvers.resolve();
 	}
 }
 

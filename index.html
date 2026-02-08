@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr" class="preload">
+<html lang="en" dir="ltr" id="doc" class="preload">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width" />
@@ -24,10 +24,10 @@
 	</head>
 	<body>
 		<nav id="nav" class="sticky top z-4 flex wrap">
-			<button type="button" class="btn btn-primary" data-nav="back" accesskey="&lt;">Back</button>
+			<button type="button" class="btn btn-primary" command="--aegis-command-root-back" commandfor="doc" accesskey="&lt;">Back</button>
 			<a class="btn btn-link" href="/" accesskey="h">Home</a>
-			<button type="button" class="btn btn-primary" data-nav="forward" accesskey="&gt;">Forward</button>
-			<button type="button" class="btn btn-primary" data-nav="reload" accesskey="r">Reload</button>
+			<button type="button" class="btn btn-primary" command="--aegis-command-root-forward" commandfor="doc" accesskey="&gt;">Forward</button>
+			<button type="button" class="btn btn-primary" command="--aegis-command-root-reload" commandfor="doc" accesskey="r">Reload</button>
 			<a href="/test/views/" class="btn btn-link" data-cache="force-cache" data-referrer-policy="origin">HTML Page</a>
 			<a class="btn btn-link" href="/product/1" data-aegis-state-name="Product 1" data-aegis-state-foo="bar" accesskey="1">Product 1</a>
 			<a class="btn btn-link" href="/product/2" data-aegis-state-name="Product 2" accesskey="2">Product 2</a>
@@ -43,8 +43,8 @@
 			<a class="btn btn-link" href="/dne" accesskey="x">404 Page</a>
 			<a class="btn btn-link" href="./" download="index.html" accesskey="d">Download</a>
 		</nav>
-		<div id="root">
+		<main id="root">
 			<stateful-el></stateful-el>
-		</div>
+		</main>
 	</body>
 </html>

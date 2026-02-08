@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.14] - 2026-02-08
+
+### Added
+- Add `AsyncDisposableStack` with clean-up to module handlers
+- Support redirects via default exports of `URL`s or functions that return `URL`s
+
 ## [v1.1.13] - 2025-12-16
 
 ### Fixed
