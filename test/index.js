@@ -1,11 +1,17 @@
 import { sanitizer } from '@aegisjsproject/sanitizer/config/base.js';
-import { init, back, forward, reload, registerPath } from '@aegisjsproject/router/router.js';
+import { init, registerPath } from '@aegisjsproject/router/router.js';
 import { observeEvents } from '@aegisjsproject/core/events.js';
-import { reset } from '@aegisjsproject/styles/reset.js';
+import reset from '@aegisjsproject/styles/css/reset.css' with { type: 'css' };
 import { baseTheme, lightTheme, darkTheme } from '@aegisjsproject/styles/theme.js';
-import { btn, btnPrimary, btnSuccess, btnDanger, btnLink } from '@aegisjsproject/styles/button.js';
-import { properties } from '@aegisjsproject/styles/properties.js';
-import { positions, displays } from '@aegisjsproject/styles/misc.js';
+// import theme from '@aegisjsproject/styles/css/theme.css' with { type: 'css' };
+import btn from '@aegisjsproject/styles/css/button.css' with { type: 'css' };
+import properties from '@aegisjsproject/styles/css/properties.css' with { type: 'css' };
+import misc from '@aegisjsproject/styles/css/misc.css' with { type: 'css' };
+import { observeCommands, initRootCommands } from '@aegisjsproject/commands';
+
+Attr.prototype.toString = function() {
+	return `${this.name}=${this.value}`;
+};
 
 const controller = new TaskController({ priority: 'background' });
 const customStyle = new CSSStyleSheet();
@@ -38,7 +44,7 @@ customStyle.replace(`
 	}
 `);
 
-document.adoptedStyleSheets = [properties, reset, baseTheme, lightTheme, darkTheme, btn, btnPrimary, btnSuccess, btnDanger, btnLink, positions, displays, customStyle];
+document.adoptedStyleSheets = [properties, reset, baseTheme, lightTheme, darkTheme, btn, misc, customStyle];
 
 globalThis.controller = controller;
 
@@ -64,26 +70,6 @@ init('#routes', {
 }).finally(() => console.timeEnd('init'));
 
 registerPath('/product/?id=:productId', ({ params: { productId } }) => URL.parse(`${location.origin}/product/${productId}`));
-
-document.querySelectorAll('[data-nav]').forEach(el => {
-	el.addEventListener('click', ({ currentTarget }) => {
-		switch (currentTarget.dataset.nav) {
-			case 'back':
-				back();
-				break;
-
-			case 'forward':
-				forward();
-				break;
-
-			case 'reload':
-				reload();
-				break;
-
-			default:
-				throw new TypeError(`Invalid nav button type: ${currentTarget.dataset.nav}.`);
-		}
-	}, { signal: controller.signal });
-});
-
 observeEvents();
+observeCommands();
+initRootCommands();

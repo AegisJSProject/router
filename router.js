@@ -403,6 +403,8 @@ function _updatePage(content) {
 	} else if (content instanceof Error) {
 		reportError(content);
 		rootEl.textContent = content.message;
+	} else if (content instanceof URL) {
+		navigate(content);
 	} else if (! (content === null || typeof content === 'undefined')) {
 		rootEl.textContent = content;
 	}
@@ -439,7 +441,14 @@ async function _handleMetadata({ title, description } = {}, { state, matches, pa
 	}
 }
 
-async function _handleModule(moduleSrc, { state = getStateObj(), matches = {}, params = {}, signal, ...args } = {}) {
+async function _handleModule(moduleSrc, {
+	state = getStateObj(),
+	matches = {},
+	params = {},
+	stack,
+	signal,
+	...args
+} = {}) {
 	const module = await Promise.try(() => {
 		if (moduleSrc instanceof Function) {
 			return moduleSrc(args);
@@ -476,17 +485,20 @@ async function _handleModule(moduleSrc, { state = getStateObj(), matches = {}, p
 			matches,
 			params,
 			state,
+			stack,
 			timestamp,
 			signal: getNavSignal({ signal }),
 			...args
 		});
 	} else if (module.default instanceof Function) {
 		_handleMetadata(module, { state, matches, params, url, signal });
+
 		return await module.default({
 			url,
 			matches,
 			params,
 			state,
+			stack,
 			timestamp,
 			signal: getNavSignal({ signal }),
 			...args
@@ -494,6 +506,8 @@ async function _handleModule(moduleSrc, { state = getStateObj(), matches = {}, p
 	} else if (module.default instanceof Node || module.default instanceof Error) {
 		_handleMetadata(module, { state, matches, params, url, signal });
 		_updatePage(module.default);
+	} else if (module.default instanceof URL && module.default.origin === location.origin) {
+		navigate(module.default);
 	} else {
 		throw new TypeError(`${moduleSrc} has a missing or invalid default export.`);
 	}
@@ -516,11 +530,16 @@ let view404 = ({ url = location, method = 'GET' }) => {
 
 async function _get404(url = location, method = 'GET', { signal, formData, integrity } = {}) {
 	const timestamp = performance.now();
+	const stack = new AsyncDisposableStack();
 
-	if (typeof view404 === 'string') {
-		return await _handleModule(view404, { url, matches: null, signal, method, formData, timestamp, integrity });
-	} else if (view404 instanceof Function) {
-		_updatePage(view404({ timestamp, state: getStateObj(), url, matches: null, signal, method, formData, integrity }));
+	try {
+		if (typeof view404 === 'string') {
+			return await _handleModule(view404, { url, matches: null, signal, method, formData, timestamp, integrity });
+		} else if (view404 instanceof Function) {
+			_updatePage(view404({ timestamp, state: getStateObj(), url, matches: null, signal, method, formData, integrity }));
+		}
+	} finally {
+		stack.disposeAsync();
 	}
 }
 
@@ -727,38 +746,44 @@ export async function getModule(input = location, {
 	signal,
 } = {}) {
 	const timestamp = performance.now();
+	const stack = new AsyncDisposableStack();
 
-	if (input === null) {
-		throw new Error('Invalid path.');
-	} else if (! (input instanceof URL)) {
-		return await getModule(URL.parse(input, document.baseURI), { signal, method, formData, state, integrity, cache, referrerPolicy });
-	} else {
-		const match = findPath(input);
-
-		if (! (match instanceof URLPattern)) {
-			return await _getHTML(input, { method, signal: getNavSignal({ signal }), body: formData, state, integrity, cache, referrerPolicy });
+	try {
+		if (input === null) {
+			throw new Error('Invalid path.');
+		} else if (! (input instanceof URL)) {
+			return await getModule(URL.parse(input, document.baseURI), { signal, method, formData, state, stack, integrity, cache, referrerPolicy });
 		} else {
-			const handler = ROUTES_REGISTRY.get(match);
-			const matches = match.exec(input);
-			const params = typeof matches === 'object'
-				? {
-					...matches.protocol.groups, ...matches.username.groups, ...matches.password.groups, ...matches.hostname.groups,
-					...matches.port.groups, ...matches.pathname.groups, ...matches.search.groups, ...matches.hash.groups,
-				} : {};
+			const match = findPath(input);
 
-			delete params['0'];
+			if (! (match instanceof URLPattern)) {
+				return await _getHTML(input, { method, signal: getNavSignal({ signal }), body: formData, state, stack, integrity, cache, referrerPolicy });
+			} else {
+				const handler = ROUTES_REGISTRY.get(match);
+				const matches = match.exec(input);
+				const params = typeof matches === 'object'
+					? {
+						...matches.protocol.groups, ...matches.username.groups, ...matches.password.groups, ...matches.hostname.groups,
+						...matches.port.groups, ...matches.pathname.groups, ...matches.search.groups, ...matches.hash.groups,
+					} : {};
 
-			return await _handleModule(handler, {
-				url: input,
-				matches,
-				params,
-				state,
-				method,
-				formData,
-				integrity,
-				timestamp,
-			});
+				delete params['0'];
+
+				return await _handleModule(handler, {
+					url: input,
+					matches,
+					params,
+					state,
+					stack,
+					method,
+					formData,
+					integrity,
+					timestamp,
+				});
+			}
 		}
+	} finally {
+		requestAnimationFrame(stack.disposeAsync.bind(stack));
 	}
 }
 

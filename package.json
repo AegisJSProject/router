@@ -1,6 +1,6 @@
 {
   "name": "@aegisjsproject/router",
-  "version": "1.1.12",
+  "version": "1.1.14",
   "description": "A simple but powerful router module",
   "keywords": [
     "router",
@@ -107,7 +107,7 @@
     "@rollup/plugin-terser": "^0.4.4",
     "@shgysk8zer0/eslint-config": "^1.0.4",
     "@shgysk8zer0/http-server": "^1.1.1",
-    "@shgysk8zer0/importmap": "^1.7.3",
+    "@shgysk8zer0/importmap": "^1.7.8",
     "eslint": "^9.23.0",
     "rollup": "^4.38.0"
   }
