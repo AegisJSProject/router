@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.15] - 2026-02-27
+
+### Added
+- Add support for exported `styles`
+- Add `AsyncDisposableStack` and disposal in `AegisNavigationEvent`
+
 ## [v1.1.14] - 2026-02-08
 
 ### Added
