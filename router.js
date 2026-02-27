@@ -46,6 +46,7 @@ const DEFAULT_REASONS = [EVENT_TYPES.back, EVENT_TYPES.forward, EVENT_TYPES.navi
 export class AegisNavigationEvent extends CustomEvent {
 	#reason;
 	#url;
+	#stack = new AsyncDisposableStack();
 	#controller = new AbortController();
 	#promises = [];
 	#errors = [];
@@ -61,6 +62,10 @@ export class AegisNavigationEvent extends CustomEvent {
 
 	get aborted() {
 		return this.#controller.signal.aborted;
+	}
+
+	get disposed() {
+		return this.#stack.disposed;
 	}
 
 	get error() {
@@ -84,6 +89,10 @@ export class AegisNavigationEvent extends CustomEvent {
 		return this.#controller.signal;
 	}
 
+	get stack() {
+		return this.#stack;
+	}
+
 	get url() {
 		return this.#url;
 	}
@@ -99,8 +108,24 @@ export class AegisNavigationEvent extends CustomEvent {
 		return result;
 	}
 
+	adopt(obj, callback) {
+		return this.#stack.adopt(obj, callback);
+	}
+
 	abort(reason) {
 		this.#controller.abort(reason);
+	}
+
+	defer(callback) {
+		this.#stack.defer(callback);
+	}
+
+	async disposeAsync() {
+		await this[Symbol.asyncDispose]();
+	}
+
+	use(obj) {
+		return this.#stack.use(obj);
 	}
 
 	waitUntil(promiseOrCallback, { signal } = {}) {
@@ -132,7 +157,8 @@ export class AegisNavigationEvent extends CustomEvent {
 		} else if (! this.defaultPrevented && promiseOrCallback instanceof Function) {
 			Promise.try(() => promiseOrCallback(this, {
 				signal: signal instanceof AbortSignal ? AbortSignal.any([signal, this.#controller.signal]) : this.#controller.signal,
-				timestamp: performance.now()
+				timestamp: performance.now(),
+				stack: this.#stack,
 			})).then(resolve, reject);
 		} else if (! this.defaultPrevented && promiseOrCallback instanceof Promise) {
 			promiseOrCallback.then(resolve, reject);
@@ -141,6 +167,16 @@ export class AegisNavigationEvent extends CustomEvent {
 
 	[Symbol.toStringTag]() {
 		return 'NavigationEvent';
+	}
+
+	async [Symbol.asyncDispose]() {
+		if (! this.#controller.signal.aborted) {
+			this.#controller.abort(new DOMException('The stack of the event was disposed.', 'AbortError'));
+		}
+
+		if (! this.#stack.disposed) {
+			await this.#stack.disposeAsync();
+		}
 	}
 
 	static get defaultType() {
@@ -163,20 +199,35 @@ async function _popstateHandler(event) {
 		detail: { newState: event.state, oldState: null, oldURL: new URL(location.href), method: 'GET', formData: null },
 	});
 
-	EVENT_TARGET.dispatchEvent(navigate);
+	try {
+		EVENT_TARGET.dispatchEvent(navigate);
 
-	if (! await navigate[NAV_CLOSE_SYMBOL]()) {
-		const old = history.scrollRestoration;
-		const [content] = await Promise.all([
-			getModule(new URL(location.href)),
-			notifyStateChange(diff),
-		]);
+		if (! await navigate[NAV_CLOSE_SYMBOL]()) {
+			const old = history.scrollRestoration;
+			const [content] = await Promise.all([
+				getModule(new URL(location.href)),
+				notifyStateChange(diff),
+			]);
 
-		history.scrollRestoration = 'auto';
-		_updatePage(content);
-		history.scrollRestoration = old;
+			history.scrollRestoration = 'auto';
+			_updatePage(content);
+			history.scrollRestoration = old;
+		}
+	} finally {
+		requestAnimationFrame(navigate[Symbol.asyncDispose].bind(navigate));
 	}
 };
+
+function _addStyle(sheet) {
+	if (sheet instanceof CSSStyleSheet && ! document.adoptedStyleSheets.includes(sheet)) {
+		document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+	} else if (Array.isArray(sheet) && sheet.length !== 0) {
+		document.adoptedStyleSheets = [
+			...document.adoptedStyleSheets,
+			...sheet.filter(s => s instanceof CSSStyleSheet && ! document.adoptedStyleSheets.includes(s))
+		];
+	}
+}
 
 function _createMeta(props = {}) {
 	const meta = document.createElement('meta');
@@ -329,28 +380,41 @@ async function _interceptFormSubmit(event) {
 		event.target.removeEventListener('submit', _interceptFormSubmit);
 	} else if (event.isTrusted && event.target.action.startsWith(location.origin)) {
 		event.preventDefault();
-		const { method, action } = event.target;
-		const formData = new FormData(event.target);
-
+		const { target, submitter } = event;
+		const { method, action } = target;
+		const formData = new FormData(target);
 		const submit = new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.submit, {
 			detail: { oldState: getStateObj(), oldURL: new URL(location.href), formData },
 		});
 
-		EVENT_TARGET.dispatchEvent(submit);
-
-		if (await submit[NAV_CLOSE_SYMBOL]()) {
-			return;
-		} else if (NO_BODY_METHODS.includes(method.toUpperCase())) {
-			const url = new URL(action);
-			const params = new URLSearchParams(formData);
-
-			for (const [key, val] of params.entries()) {
-				url.searchParams.append(key, val);
+		try {
+			if (submitter instanceof HTMLButtonElement) {
+				submitter.disabled = true;
 			}
 
-			await navigate(url, getStateObj(), { method });
-		} else {
-			await navigate(action, getStateObj(), { method, formData });
+
+			EVENT_TARGET.dispatchEvent(submit);
+
+			if (await submit[NAV_CLOSE_SYMBOL]()) {
+				return;
+			} else if (NO_BODY_METHODS.includes(method.toUpperCase())) {
+				const url = new URL(action);
+				const params = new URLSearchParams(formData);
+
+				for (const [key, val] of params.entries()) {
+					url.searchParams.append(key, val);
+				}
+
+				await navigate(url, getStateObj(), { method });
+			} else {
+				await navigate(action, getStateObj(), { method, formData });
+			}
+		} finally {
+			if (submitter instanceof HTMLButtonElement) {
+				submitter.disabled = false;
+			}
+
+			requestAnimationFrame(submit[Symbol.asyncDispose].bind(submit));
 		}
 	}
 }
@@ -409,7 +473,8 @@ function _updatePage(content) {
 		rootEl.textContent = content;
 	}
 
-	EVENT_TARGET.dispatchEvent(new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.load, { cancelable: false }));
+	const ev = new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.load, { cancelable: false });
+	Promise.try(() => EVENT_TARGET.dispatchEvent(ev)).finally(ev[Symbol.asyncDispose].bind(ev));
 
 	if (history.scrollRestoration === 'manual') {
 		if (location.hash.length > 1) {
@@ -478,6 +543,10 @@ async function _handleModule(moduleSrc, {
 			);
 		}
 
+		if (typeof module.styles !== 'undefined') {
+			_addStyle(module.styles);
+		}
+
 		_handleMetadata(module, { state, matches, params, url, signal });
 
 		return new module.default({
@@ -491,6 +560,10 @@ async function _handleModule(moduleSrc, {
 			...args
 		});
 	} else if (module.default instanceof Function) {
+		if (typeof module.styles !== 'undefined') {
+			_addStyle(module.styles);
+		}
+
 		_handleMetadata(module, { state, matches, params, url, signal });
 
 		return await module.default({
@@ -504,6 +577,10 @@ async function _handleModule(moduleSrc, {
 			...args
 		});
 	} else if (module.default instanceof Node || module.default instanceof Error) {
+		if (typeof module.styles !== 'undefined') {
+			_addStyle(module.styles);
+		}
+
 		_handleMetadata(module, { state, matches, params, url, signal });
 		_updatePage(module.default);
 	} else if (module.default instanceof URL && module.default.origin === location.origin) {
@@ -822,12 +899,13 @@ export async function navigate(url, newState = getStateObj(), {
 
 		return await navigate(url, newState, { signal, method, cache, referrerPolicy, integrity });
 	} else if (url.href !== location.href) {
+		const oldState = getStateObj();
+		const navigate = new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.navigate, {
+			detail: { newState, oldState, oldURL: new URL(location.href), newURL: url, method, formData },
+		});
+
 		try {
-			const oldState = getStateObj();
 			const diff = diffState(newState, oldState);
-			const navigate = new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.navigate, {
-				detail: { newState, oldState, oldURL: new URL(location.href), newURL: url, method, formData },
-			});
 
 			EVENT_TARGET.dispatchEvent(navigate);
 
@@ -848,6 +926,8 @@ export async function navigate(url, newState = getStateObj(), {
 		} catch(err) {
 			back();
 			reportError(err);
+		} finally {
+			requestAnimationFrame(navigate[Symbol.asyncDispose].bind(navigate));
 		}
 	}
 }
@@ -864,7 +944,7 @@ export async function back({ signal } = {}) {
 			history.back();
 			await whenNavigated({ signal, reasons: [EVENT_TYPES.load] });
 		}
-	});
+	}).finally(event[Symbol.asyncDispose].bind(event));
 }
 
 /**
@@ -879,7 +959,7 @@ export async function forward({ signal } = {}) {
 			history.forward();
 			await whenNavigated({ signal, reasons: [EVENT_TYPES.load] });
 		}
-	});
+	}).finally(event[Symbol.asyncDispose].bind(event));
 }
 
 /**
@@ -896,7 +976,7 @@ export async function go(delta = 0, { signal } = {}) {
 			history.go(delta);
 			await whenNavigated({ signal, reasons: [EVENT_TYPES.load] });
 		}
-	});
+	}).finally(event[Symbol.asyncDispose].bind(event));
 }
 
 /**
@@ -910,7 +990,7 @@ export function reload() {
 		if (! prevented) {
 			history.go(0);
 		}
-	});
+	}).finally(event[Symbol.asyncDispose].bind(event));
 }
 
 /**
