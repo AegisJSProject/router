@@ -1,6 +1,6 @@
 {
   "name": "@aegisjsproject/router",
-  "version": "1.1.15",
+  "version": "1.2.0",
   "description": "A simple but powerful router module",
   "keywords": [
     "router",
@@ -95,20 +95,20 @@
   },
   "homepage": "https://github.com/AegisJSProject/router#readme",
   "dependencies": {
-    "@aegisjsproject/state": "^1.0.5"
+    "@aegisjsproject/state": "^1.0.7"
   },
   "devDependencies": {
-    "@aegisjsproject/component": "^0.1.6",
-    "@aegisjsproject/core": "^0.2.27",
-    "@aegisjsproject/dev-server": "^1.0.5",
+    "@aegisjsproject/component": "^0.1.8",
+    "@aegisjsproject/core": "^0.2.34",
+    "@aegisjsproject/dev-server": "^1.0.6",
     "@aegisjsproject/http-utils": "^1.0.4",
     "@aegisjsproject/url": "^1.0.3",
-    "@rollup/plugin-node-resolve": "^16.0.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-terser": "^1.0.0",
-    "@shgysk8zer0/eslint-config": "^1.0.4",
-    "@shgysk8zer0/http-server": "^1.1.1",
-    "@shgysk8zer0/importmap": "^1.7.8",
-    "eslint": "^10.0.0",
-    "rollup": "^4.38.0"
+    "@shgysk8zer0/eslint-config": "^1.0.9",
+    "@shgysk8zer0/http-server": "^1.1.2",
+    "@shgysk8zer0/importmap": "^1.9.12",
+    "eslint": "^10.2.1",
+    "rollup": "^4.60.2"
   }
 }

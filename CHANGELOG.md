@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.2.0] - 2026-04-30
+
+### Added
+- Implement basics of View Transitions
+
 ## [v1.1.15] - 2026-02-27
 
 ### Added

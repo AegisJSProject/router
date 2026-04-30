@@ -3,6 +3,7 @@ import { useDefaultCSP, addScriptSrc, addStyleSrc, addConnectSrc, addImageSrc, a
 
 addScriptSrc(
 	imports['@shgysk8zer0/polyfills'],
+	imports['@shgysk8zer0/signals/'],
 	'https://unpkg.com/@aegisjsproject/',
 	'https://unpkg.com/@lit/',
 	imports.marked,
@@ -10,7 +11,11 @@ addScriptSrc(
 	imports['@highlightjs/cdn-assets/'],
 );
 addConnectSrc('https://api.github.com/users/', 'https://baconipsum.com/api/');
-addStyleSrc(imports['@shgysk8zer0/core-css/'], imports['@highlightjs/cdn-assets/es/styles/']);
+addStyleSrc(
+	imports['@shgysk8zer0/core-css/'],
+	imports['@aegisjsproject/styles/'] + 'css/',
+	imports['@highlightjs/cdn-assets/es/styles/'],
+);
 addImageSrc('https://avatars.githubusercontent.com/u/', 'https://images.unsplash.com/', 'blob:');
 addTrustedTypePolicy('aegis-router#html', 'aegis-sanitizer#html', 'aegis-escape#html', 'lit-html', 'default');
 lockCSP();
