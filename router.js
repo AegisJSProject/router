@@ -18,6 +18,10 @@ let rootSelector = '#' + ROOT_ID;
 const SUPPORTS_TRUSTED_TYPES = 'trustedTypes' in globalThis;
 const _isTrustedHTML = input => SUPPORTS_TRUSTED_TYPES && trustedTypes.isHTML(input);
 
+const startViewTransition = typeof document.startViewTransition === 'function'
+	? (update, types) => document.startViewTransition({ update, types })
+	: update => Promise.try(update);
+
 function _handlePreloadMutations(target) {
 	if (target instanceof MutationRecord) {
 		_handlePreloadMutations(target.target);
@@ -440,38 +444,40 @@ async function _getHTML(url, { signal, method = 'GET', body, integrity, cache = 
 	}
 }
 
-function _updatePage(content) {
+async function _updatePage(content) {
 	const timestamp = performance.now();
 
-	if (content instanceof Document) {
-		if (content.head.childElementCount !== 0) {
-			setTitle(content.title);
-			setDescription(content.querySelector(DESC_SELECTOR)?.content);
+	await startViewTransition(() => {
+		if (content instanceof Document) {
+			if (content.head.childElementCount !== 0) {
+				setTitle(content.title);
+				setDescription(content.querySelector(DESC_SELECTOR)?.content);
+			}
+
+			const contentEl = typeof rootSelector === 'string' ? content.body.querySelector(rootSelector) ?? content.body : content.body;
+
+			rootEl.replaceChildren(...contentEl.childNodes);
+		} else if (content instanceof HTMLTemplateElement) {
+			rootEl.replaceChildren(content.content);
+		} else if (content instanceof Function && content.prototype instanceof HTMLElement) {
+			rootEl.replaceChildren(new content({ state: getStateObj(), url: new URL(location.href), timestamp }));
+		} else if (content instanceof Node) {
+			rootEl.replaceChildren(content);
+		} else if (content instanceof Function) {
+			_updatePage(content());
+		} else if (typeof content === 'string') {
+			rootEl.setHTMLUnsafe(policy.createHTML(content));
+		} else if (_isTrustedHTML(content)) {
+			rootEl.setHTMLUnsafe(content);
+		} else if (content instanceof Error) {
+			reportError(content);
+			rootEl.textContent = content.message;
+		} else if (content instanceof URL) {
+			navigate(content);
+		} else if (! (content === null || typeof content === 'undefined')) {
+			rootEl.textContent = content;
 		}
-
-		const contentEl = typeof rootSelector === 'string' ? content.body.querySelector(rootSelector) ?? content.body : content.body;
-
-		rootEl.replaceChildren(...contentEl.childNodes);
-	} else if (content instanceof HTMLTemplateElement) {
-		rootEl.replaceChildren(content.content);
-	} else if (content instanceof Function && content.prototype instanceof HTMLElement) {
-		rootEl.replaceChildren(new content({ state: getStateObj(), url: new URL(location.href), timestamp }));
-	} else if (content instanceof Node) {
-		rootEl.replaceChildren(content);
-	} else if (content instanceof Function) {
-		_updatePage(content());
-	} else if (typeof content === 'string') {
-		rootEl.setHTMLUnsafe(policy.createHTML(content));
-	} else if (_isTrustedHTML(content)) {
-		rootEl.setHTMLUnsafe(content);
-	} else if (content instanceof Error) {
-		reportError(content);
-		rootEl.textContent = content.message;
-	} else if (content instanceof URL) {
-		navigate(content);
-	} else if (! (content === null || typeof content === 'undefined')) {
-		rootEl.textContent = content;
-	}
+	});
 
 	const ev = new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.load, { cancelable: false });
 	Promise.try(() => EVENT_TARGET.dispatchEvent(ev)).finally(ev[Symbol.asyncDispose].bind(ev));

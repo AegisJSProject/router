@@ -56,16 +56,16 @@ init('#routes', {
 	rootEl: '#root',
 	inteceptRoot: document.body,
 	observePreloads: true,
-	transition: {
-		keyframes: {
-			opacity: [1, 0],
-			transform: ['none', 'scale(0.8) translateX(-100%)']
-		},
-		options: {
-			easing: 'ease-in',
-			duration: 150,
-		}
-	},
+	// transition: {
+	// 	keyframes: {
+	// 		opacity: [1, 0],
+	// 		transform: ['none', 'scale(0.8) translateX(-100%)']
+	// 	},
+	// 	options: {
+	// 		easing: 'ease-in',
+	// 		duration: 150,
+	// 	}
+	// },
 	signal: controller.signal,
 }).finally(() => console.timeEnd('init'));
 
