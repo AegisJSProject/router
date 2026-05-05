@@ -1159,9 +1159,6 @@ export async function init(routes, {
 			observeLinksOn(inteceptRoot, { signal });
 		}
 
-		const content = await getModule(new URL(location.href));
-		setScrollRestoration(scrollRestoration);
-		_updatePage(content);
 		addPopstateListener({ signal });
 
 		if (typeof keyframes === 'object' && keyframes !== null) {
@@ -1185,6 +1182,12 @@ export async function init(routes, {
 				throw new AggregateError(errs.map(err => err.reason), 'Error initializing module routes.');
 			}
 		});
+
+		if (ROUTES_REGISTRY.keys().some(pattern => pattern.test(location.href))) {
+			const content = await getModule(new URL(location.href));
+			setScrollRestoration(scrollRestoration);
+			_updatePage(content);
+		}
 	}
 
 	return getNavSignal({ signal });

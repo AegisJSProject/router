@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.2.1] - 2026-05-05
+
+### Changed
+- Do not load route in `init()` unless pattern / module is registered
+
 ## [v1.2.0] - 2026-04-30
 
 ### Added
