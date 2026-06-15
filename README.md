@@ -26,7 +26,7 @@ A simple but powerful router module
 
 - [Code of Conduct](./.github/CODE_OF_CONDUCT.md)
 - [Contributing](./.github/CONTRIBUTING.md)
-<!-- - [Security Policy](./.github/SECURITY.md) -->
+- [Security Policy](./.github/SECURITY.md)
 
 > [!CRITICAL]
 > This package requires [`URLPattern`](https://developer.mozilla.org/en-US/docs/Web/API/URLPattern) to be polyfilled *before*
