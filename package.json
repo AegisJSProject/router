@@ -99,7 +99,7 @@
   },
   "devDependencies": {
     "@aegisjsproject/component": "^0.2.0",
-    "@aegisjsproject/core": "^0.2.34",
+    "@aegisjsproject/core": "^0.3.0",
     "@aegisjsproject/dev-server": "^1.1.0",
     "@aegisjsproject/http-utils": "^1.1.0",
     "@aegisjsproject/url": "^1.1.0",
