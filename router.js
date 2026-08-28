@@ -19,8 +19,8 @@ const SUPPORTS_TRUSTED_TYPES = 'trustedTypes' in globalThis;
 const _isTrustedHTML = input => SUPPORTS_TRUSTED_TYPES && trustedTypes.isHTML(input);
 
 const startViewTransition = typeof document.startViewTransition === 'function'
-	? (update, types) => document.startViewTransition({ update, types })
-	: update => Promise.try(update);
+	? async (update, types) =>  await document.startViewTransition({ update, types }).finished
+	: async update => await Promise.try(update);
 
 function _handlePreloadMutations(target) {
 	if (target instanceof MutationRecord) {
@@ -480,22 +480,30 @@ async function _updatePage(content) {
 	});
 
 	const ev = new AegisNavigationEvent(NAV_EVENT, EVENT_TYPES.load, { cancelable: false });
-	Promise.try(() => EVENT_TARGET.dispatchEvent(ev)).finally(ev[Symbol.asyncDispose].bind(ev));
+	await Promise.try(() => EVENT_TARGET.dispatchEvent(ev)).finally(ev[Symbol.asyncDispose].bind(ev));
 
-	if (history.scrollRestoration === 'manual') {
-		if (location.hash.length > 1) {
-			const target = document.getElementById(location.hash.substring(1)) ?? document.body;
-			target.scrollIntoView({ behavior: prefersReducedMotion.matches ? 'instant' : 'smooth' });
-		} else {
-			const autofocus = rootEl.querySelector('[autofocus]');
-
-			if (autofocus instanceof Element) {
-				autofocus.focus();
+	requestAnimationFrame(() => {
+		if (history.scrollRestoration === 'manual') {
+			if (location.hash.length > 1) {
+				const target = document.getElementById(location.hash.substring(1)) ?? document.body;
+				target.scrollIntoView({ behavior: prefersReducedMotion.matches ? 'instant' : 'smooth' });
 			} else {
-				document.body.scrollIntoView({ behavior: prefersReducedMotion.matches ? 'instant' : 'smooth' });
+				const autofocus = rootEl.querySelector('[autofocus]');
+
+				if (autofocus instanceof Element) {
+					autofocus.focus();
+				} else {
+					document.body.scrollIntoView({ behavior: prefersReducedMotion.matches ? 'instant' : 'smooth' });
+				}
+			}
+		} else if (location.hash.length > 1) {
+			const target = document.getElementById(location.hash.substring(1));
+
+			if (target instanceof Element) {
+				target.scrollIntoView({ behavior: prefersReducedMotion.matches ? 'instant' : 'smooth' });
 			}
 		}
-	}
+	});
 }
 
 async function _handleMetadata({ title, description } = {}, { state, matches, params, url, signal } = {}) {
@@ -1186,7 +1194,19 @@ export async function init(routes, {
 		if (ROUTES_REGISTRY.keys().some(pattern => pattern.test(location.href))) {
 			const content = await getModule(new URL(location.href));
 			setScrollRestoration(scrollRestoration);
-			_updatePage(content);
+			await _updatePage(content);
+
+			if (location.hash.length > 1) {
+				requestAnimationFrame(() => {
+					const target = document.getElementById(location.hash.substring(1));
+
+					console.log({ target });
+
+					if (target instanceof Element) {
+						target.scrollIntoView({ behavior: prefersReducedMotion.matches ? 'instant' : 'smooth' });
+					}
+				});
+			}
 		}
 	}
 

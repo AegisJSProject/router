@@ -28,7 +28,7 @@ export default params => {
 	const blob = getBlob({ size, radius, fill });
 	const uri = params.stack.adopt(URL.createObjectURL(blob), URL.revokeObjectURL);
 
-	return html`
+	return html`<div class="gap"></div>
 		<form action="/search" method="GET" id="search" ${EVENTS.onSubmit}="${submitHandler}" ${signalAttr}="${params.signal}">
 			<label for="query">Query</label>
 			<input type="search" id="query" name="q" placeholder="Search for..." ${attr('value', query)} ${EVENTS.onChange}="${FUNCS.debug.info}" ${EVENTS.onInput}="${inputHandler}" ${signalAttr}="${params.signal}" autofocus="" required="" />
@@ -41,8 +41,10 @@ export default params => {
 			<summary>Request Details</summary>
 			<pre><code>${JSON.stringify(params, null, 2)}</code></pre>
 		</details>
-	`;
+	<div class="gap"></div>`;
 };
 
 export const title = () => `Search results for "${query}"`;
 export const description = () => `Search results for "${query}"`;
+
+export const styles = [await new CSSStyleSheet().replace('.gap {height: 120vh;}')];
